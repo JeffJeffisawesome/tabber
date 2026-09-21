@@ -545,7 +545,21 @@
 .utility-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.85rem;
+}
+
+.btn-chord-toggle {
+  background-color: #fff;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.btn-chord-toggle.active {
+  background-color: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .zoom-group {
@@ -567,7 +581,7 @@
 }
 
 .btn-tiny {
-  padding: 0.25rem 0.55rem;
+  padding: 0.3rem 0.65rem;
   background-color: #fff;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -584,21 +598,252 @@
   padding: 0.35rem 0.75rem;
 }
 
-/* Monospaced Tab Output Container */
+/* Tab Viewer Body: Split into Lyrics/Tabs on Left, Chord Diagrams on Right */
+.tab-viewer-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Tab & Lyric Content Container */
 .tab-content-container {
   flex: 1;
   overflow: auto;
-  padding: 1.5rem 1.75rem;
+  padding: 2rem 2.25rem;
   background-color: #fbf7f0;
   scroll-behavior: smooth;
 }
 
-.tab-content-pre {
+/* Standardized Lyrics & Chords View */
+.lyric-chord-display {
+  font-family: var(--font-family);
+  color: #201812;
+  line-height: 1.6;
+}
+
+.song-section-header {
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px dashed var(--border);
+  font-size: 1.05em;
+  letter-spacing: 0.02em;
+}
+
+.song-section-header:first-child {
+  margin-top: 0;
+}
+
+.chord-lyric-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 0.85rem;
+  row-gap: 0.5rem;
+}
+
+.chord-lyric-pair {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  vertical-align: bottom;
+}
+
+.chord-pill {
+  font-size: 0.82em;
+  font-weight: 700;
+  color: var(--primary);
+  background: transparent;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  line-height: 1.2;
+  margin-bottom: 0.15rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.chord-pill:hover {
+  background-color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.chord-pill.active-chord {
+  background-color: var(--primary);
+  color: #fff;
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 6px rgba(184, 98, 20, 0.4);
+}
+
+.chord-pill-spacer {
+  height: 1.2em;
+  margin-bottom: 0.15rem;
+  display: inline-block;
+}
+
+.lyric-syllable {
+  white-space: pre;
+  color: #241c15;
+  font-size: 1em;
+}
+
+.plain-lyric-line {
+  min-height: 1.4em;
+  margin-bottom: 0.4rem;
+  color: #3b3026;
+}
+
+.tab-staff-pre {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
   line-height: 1.35;
   color: #201812;
   white-space: pre;
   tab-size: 4;
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  background-color: #f5ede1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+/* Chord Diagrams Side Panel */
+.chord-sidebar {
+  width: 290px;
+  min-width: 260px;
+  max-width: 320px;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.chord-sidebar-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #eee4d4;
+}
+
+.chord-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.chord-count-tag {
+  background-color: var(--primary);
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.btn-close-sidebar {
+  background: transparent;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.btn-close-sidebar:hover {
+  color: var(--text-primary);
+}
+
+.chord-diagrams-scroll {
+  padding: 1rem 0.85rem;
+  overflow-y: auto;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.chord-diagram-card {
+  background-color: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(44, 34, 26, 0.05);
+}
+
+.chord-diagram-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(44, 34, 26, 0.1);
+}
+
+.chord-diagram-card.highlighted {
+  border-color: var(--primary);
+  background-color: #fffbeb;
+  box-shadow: 0 0 0 2px var(--primary), 0 4px 10px rgba(184, 98, 20, 0.25);
+  transform: scale(1.02);
+}
+
+.chord-svg {
+  display: block;
+  color: #1e1610;
+}
+
+.chord-fallback-card {
+  background-color: #fff;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.chord-fallback-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: var(--primary);
+}
+
+.chord-fallback-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.chord-sidebar-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.chord-sidebar-hint {
+  margin-top: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.chord-sidebar-hint code {
+  background: #fff;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--primary);
 }
 
 /* Modal Dialog */
@@ -625,6 +870,10 @@
   flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(44, 34, 26, 0.15), 0 8px 10px -6px rgba(44, 34, 26, 0.1);
   overflow: hidden;
+}
+
+.modal-dialog-wide {
+  max-width: 820px;
 }
 
 .modal-header {
@@ -695,6 +944,18 @@
   letter-spacing: 0.05em;
 }
 
+.label-hint {
+  font-size: 0.75rem;
+  font-weight: normal;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.label-hint code {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .form-input,
 .form-select,
 .form-textarea {
@@ -712,6 +973,62 @@
   border-color: var(--primary);
   outline: none;
   box-shadow: 0 0 0 2px rgba(184, 98, 20, 0.15);
+}
+
+/* Quick Chord Inserter Bar */
+.chord-tools-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chord-tools-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chord-tools-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.template-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.quick-chord-buttons {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.btn-chord-insert {
+  background-color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-chord-insert:hover {
+  background-color: #fef3c7;
+  border-color: var(--primary);
 }
 
 .tab-content-header-row {
@@ -813,6 +1130,16 @@
 }
 
 /* Responsive */
+@media (max-width: 960px) {
+  .chord-sidebar {
+    width: 220px;
+    min-width: 200px;
+  }
+  .chord-diagrams-scroll {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .tabber-workspace {
     flex-direction: column;
@@ -822,6 +1149,19 @@
     max-height: 240px;
     border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+  .tab-viewer-body {
+    flex-direction: column;
+  }
+  .chord-sidebar {
+    width: 100%;
+    max-width: none;
+    max-height: 220px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .chord-diagrams-scroll {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   }
   .form-grid-2,
   .form-grid-3 {

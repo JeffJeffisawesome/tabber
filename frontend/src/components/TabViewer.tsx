@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { GuitarTab } from '../types/api';
+import { extractChordsFromSong } from '../utils/chordData';
+import ChordDiagram from './ChordDiagram';
+import LyricChordView from './LyricChordView';
 
 interface TabViewerProps {
   tab: GuitarTab;
@@ -14,13 +17,20 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const [fontSize, setFontSize] = useState<number>(14);
+  const [fontSize, setFontSize] = useState<number>(15);
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
-  const [scrollSpeed, setScrollSpeed] = useState<number>(2); // 1 (slow) to 5 (fast)
+  const [scrollSpeed, setScrollSpeed] = useState<number>(2);
   const [copied, setCopied] = useState<boolean>(false);
+  const [showChordSidebar, setShowChordSidebar] = useState<boolean>(true);
+  const [highlightedChord, setHighlightedChord] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollIntervalRef = useRef<number | null>(null);
+
+  // Extract all unique chords present in this song
+  const uniqueChords = useMemo(() => {
+    return extractChordsFromSong(tab.content);
+  }, [tab.content]);
 
   // Auto-scroll loop
   useEffect(() => {
@@ -28,7 +38,6 @@ export const TabViewer: React.FC<TabViewerProps> = ({
       scrollIntervalRef.current = window.setInterval(() => {
         if (containerRef.current) {
           const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-          // Stop auto-scroll when reaching the bottom
           if (scrollTop + clientHeight >= scrollHeight - 2) {
             setIsAutoScrolling(false);
             return;
@@ -50,9 +59,10 @@ export const TabViewer: React.FC<TabViewerProps> = ({
     };
   }, [isAutoScrolling, scrollSpeed]);
 
-  // Stop auto-scroll when tab changes
+  // Reset scroll and highlighted chord on tab switch
   useEffect(() => {
     setIsAutoScrolling(false);
+    setHighlightedChord(null);
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
@@ -64,8 +74,15 @@ export const TabViewer: React.FC<TabViewerProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback
       setCopied(false);
+    }
+  };
+
+  const handleChordSelect = (chord: string) => {
+    setHighlightedChord(chord);
+    // Make sure chord sidebar is open when user clicks a chord
+    if (!showChordSidebar) {
+      setShowChordSidebar(true);
     }
   };
 
@@ -109,7 +126,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
         </div>
       </div>
 
-      {/* Control Bar: Zoom & Hands-Free Auto Scroll */}
+      {/* Control Bar */}
       <div className="tab-controls-bar">
         {/* Hands-Free Auto-Scroll */}
         <div className="auto-scroll-group">
@@ -136,13 +153,22 @@ export const TabViewer: React.FC<TabViewerProps> = ({
           </div>
         </div>
 
-        {/* Font Zoom & Copy */}
+        {/* Font Zoom, Chord Panel Toggle & Copy */}
         <div className="utility-group">
+          {/* Chord Panel Toggle */}
+          <button
+            className={`btn-tiny btn-chord-toggle ${showChordSidebar ? 'active' : ''}`}
+            onClick={() => setShowChordSidebar(!showChordSidebar)}
+            title="Toggle Chord Fingerings Panel"
+          >
+            🎸 Chord Fingerings ({uniqueChords.length})
+          </button>
+
           <div className="zoom-group">
             <span className="control-label">Font:</span>
             <button
               className="btn-tiny"
-              onClick={() => setFontSize((s) => Math.max(11, s - 1))}
+              onClick={() => setFontSize((s) => Math.max(12, s - 1))}
               title="Decrease font size"
             >
               A-
@@ -150,7 +176,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
             <span className="font-size-val">{fontSize}px</span>
             <button
               className="btn-tiny"
-              onClick={() => setFontSize((s) => Math.min(22, s + 1))}
+              onClick={() => setFontSize((s) => Math.min(24, s + 1))}
               title="Increase font size"
             >
               A+
@@ -158,20 +184,66 @@ export const TabViewer: React.FC<TabViewerProps> = ({
           </div>
 
           <button className="btn-tiny btn-copy" onClick={handleCopy}>
-            {copied ? '✓ Copied!' : '📋 Copy Tab'}
+            {copied ? '✓ Copied!' : '📋 Copy'}
           </button>
         </div>
       </div>
 
-      {/* Monospaced Tab Output Container */}
-      <div className="tab-content-container" ref={containerRef}>
-        <pre className="tab-content-pre" style={{ fontSize: `${fontSize}px` }}>
-          {tab.content}
-        </pre>
+      {/* Main Content Area: Tab/Lyrics + Chord Side Panel */}
+      <div className="tab-viewer-body">
+        {/* Left/Center: Lyrics & Tab Renderer */}
+        <div className="tab-content-container" ref={containerRef}>
+          <LyricChordView
+            content={tab.content}
+            fontSize={fontSize}
+            highlightedChord={highlightedChord}
+            onSelectChord={handleChordSelect}
+          />
+        </div>
+
+        {/* Right: SVG Guitar Chord Diagrams Panel */}
+        {showChordSidebar && (
+          <aside className="chord-sidebar">
+            <div className="chord-sidebar-header">
+              <div className="chord-sidebar-title">
+                <span>🎸 Chord Fingerings</span>
+                <span className="chord-count-tag">{uniqueChords.length}</span>
+              </div>
+              <button
+                className="btn-close-sidebar"
+                onClick={() => setShowChordSidebar(false)}
+                title="Hide chord diagrams"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="chord-diagrams-scroll">
+              {uniqueChords.length === 0 ? (
+                <div className="chord-sidebar-empty">
+                  <p>No standard chords detected in this tab.</p>
+                  <p className="chord-sidebar-hint">
+                    Format chords in brackets like <code>[G]</code>, <code>[Am]</code>, or <code>[C]</code> to show their fingerings here!
+                  </p>
+                </div>
+              ) : (
+                uniqueChords.map((chordName) => (
+                  <ChordDiagram
+                    key={chordName}
+                    chord={chordName}
+                    width={115}
+                    height={140}
+                    isHighlighted={highlightedChord === chordName}
+                    onClick={() => setHighlightedChord(chordName)}
+                  />
+                ))
+              )}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
 };
 
 export default TabViewer;
-

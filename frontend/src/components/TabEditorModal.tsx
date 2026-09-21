@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { GuitarTab, TabCreate, TabDifficulty } from '../types/api';
 
 interface TabEditorModalProps {
@@ -16,7 +16,20 @@ const COMMON_TUNINGS = [
   'Open G (D G D G B D)',
 ];
 
-const DEFAULT_TAB_TEMPLATE = `[Intro / Main Riff]
+const CHORD_LYRIC_TEMPLATE = `[Verse 1]
+[G]Almost heaven, [Em]West Virginia
+[D]Blue Ridge Mountains, [C]Shenandoah [G]River
+[G]Life is old there, [Em]older than the trees
+[D]Younger than the mountains, [C]growin' like a [G]breeze
+
+[Chorus]
+Country [G]roads, take me [D]home
+To the [Em]place I be[C]long
+West Vir[G]ginia, mountain [D]mama
+Take me [C]home, country [G]roads
+`;
+
+const STAFF_TAB_TEMPLATE = `[Intro / Main Riff]
 
 e|-------------------|-------------------|
 B|-------------------|-------------------|
@@ -25,6 +38,8 @@ D|-------------------|-------------------|
 A|-------------------|-------------------|
 E|-------------------|-------------------|
 `;
+
+const QUICK_CHORDS = ['G', 'C', 'D', 'Em', 'Am', 'F', 'A', 'E', 'Bm', 'Cadd9', 'Dsus4'];
 
 export const TabEditorModal: React.FC<TabEditorModalProps> = ({
   initialTab,
@@ -41,10 +56,12 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
   const [difficulty, setDifficulty] = useState<TabDifficulty>(
     initialTab?.difficulty || 'Intermediate'
   );
-  const [content, setContent] = useState(initialTab?.content || DEFAULT_TAB_TEMPLATE);
+  const [content, setContent] = useState(initialTab?.content || CHORD_LYRIC_TEMPLATE);
   const [isFavorite, setIsFavorite] = useState<boolean>(initialTab?.is_favorite ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,13 +92,30 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
     }
   };
 
-  const insertTemplate = () => {
-    setContent((prev) => (prev.trim() ? `${prev}\n\n${DEFAULT_TAB_TEMPLATE}` : DEFAULT_TAB_TEMPLATE));
+  const insertChord = (chord: string) => {
+    const chordTag = `[${chord}]`;
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setContent((prev) => `${prev} ${chordTag}`);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = text.substring(0, start) + chordTag + text.substring(end);
+    setContent(newText);
+
+    // Restore focus and cursor position after insertion
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + chordTag.length, start + chordTag.length);
+    }, 0);
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-dialog modal-dialog-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{isEditing ? '✏️ Edit Guitar Tab' : '🎸 Store New Guitar Tab'}</h3>
           <button className="btn-close-modal" onClick={onClose}>
@@ -99,7 +133,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
                 id="tab-title"
                 type="text"
                 className="form-input"
-                placeholder="e.g. Blackbird"
+                placeholder="e.g. Country Roads"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -112,7 +146,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
                 id="tab-artist"
                 type="text"
                 className="form-input"
-                placeholder="e.g. The Beatles"
+                placeholder="e.g. John Denver"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
                 required
@@ -176,23 +210,56 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
             </div>
           </div>
 
+          {/* Quick Insert Chords & Format Helper */}
+          <div className="chord-tools-card">
+            <div className="chord-tools-header">
+              <span className="chord-tools-title">⚡ Quick Insert Chord (ChordPro format)</span>
+              <div className="template-links">
+                <button
+                  type="button"
+                  className="btn-text-link"
+                  onClick={() => setContent(CHORD_LYRIC_TEMPLATE)}
+                >
+                  Load Chord/Lyric Template
+                </button>
+                <span>&bull;</span>
+                <button
+                  type="button"
+                  className="btn-text-link"
+                  onClick={() => setContent(STAFF_TAB_TEMPLATE)}
+                >
+                  Load 6-String Staff Template
+                </button>
+              </div>
+            </div>
+
+            <div className="quick-chord-buttons">
+              {QUICK_CHORDS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="btn-chord-insert"
+                  onClick={() => insertChord(c)}
+                  title={`Insert [${c}] at cursor`}
+                >
+                  [{c}]
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="form-group">
             <div className="tab-content-header-row">
-              <label htmlFor="tab-content">Tablature & Chords (ASCII) *</label>
-              <button
-                type="button"
-                className="btn-text-link"
-                onClick={insertTemplate}
-                title="Insert empty 6-string tab block"
-              >
-                + Insert 6-String Staff Template
-              </button>
+              <label htmlFor="tab-content">
+                Tab / Lyrics Content * <span className="label-hint">(Use <code>[Chord]word</code> to place chords directly over lyrics)</span>
+              </label>
             </div>
             <textarea
               id="tab-content"
+              ref={textareaRef}
               className="form-textarea tab-editor-textarea"
-              rows={14}
-              placeholder="Paste or write your monospaced ASCII tab lines or chords here..."
+              rows={13}
+              placeholder="Type or paste lyrics with [Chord] tags (e.g. [G]Almost [D]heaven...) or 6-string tab staves..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               required
@@ -225,4 +292,3 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
 };
 
 export default TabEditorModal;
-

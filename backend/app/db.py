@@ -50,6 +50,66 @@ def seed_tabs(cursor: sqlite3.Cursor) -> None:
     now = datetime.now(timezone.utc).isoformat()
     starter_tabs = [
         (
+            "Take Me Home, Country Roads",
+            "John Denver",
+            "Standard (E A D G B E)",
+            2,
+            "Beginner",
+            """[Verse 1]
+[G]Almost heaven, [Em]West Virginia
+[D]Blue Ridge Mountains, [C]Shenandoah [G]River
+[G]Life is old there, [Em]older than the trees
+[D]Younger than the mountains, [C]growin' like a [G]breeze
+
+[Chorus]
+Country [G]roads, take me [D]home
+To the [Em]place I be[C]long
+West Vir[G]ginia, mountain [D]mama
+Take me [C]home, country [G]roads
+
+[Verse 2]
+[G]All my memories [Em]gather 'round her
+[D]Miner's lady, [C]stranger to blue [G]water
+[G]Dark and dusty, [Em]painted on the sky
+[D]Misty taste of moonshine, [C]teardrop in my [G]eye
+
+[Bridge]
+[Em]I hear her [D]voice in the [G]mornin' hour, she calls me
+The [C]radio re[G]minds me of my [D]home far away
+And [Em]drivin' down the [F]road, I get a [C]feelin'
+That I [G]should have been home [D]yesterday, yester[D7]day
+""",
+            1,
+            now,
+            now,
+        ),
+        (
+            "Knockin' on Heaven's Door",
+            "Bob Dylan",
+            "Standard (E A D G B E)",
+            0,
+            "Beginner",
+            """[Intro]
+[G]   [D]   [Am]
+[G]   [D]   [C]
+
+[Verse 1]
+[G]Mama, take this [D]badge off of [Am]me
+[G]I can't [D]use it any[C]more
+[G]It's gettin' [D]dark, too dark to [Am]see
+[G]I feel I'm [D]knockin' on heaven's [C]door
+
+[Chorus]
+[G]Knock, knock, [D]knockin' on heaven's [Am]door
+[G]Knock, knock, [D]knockin' on heaven's [C]door
+[G]Knock, knock, [D]knockin' on heaven's [Am]door
+[G]Knock, knock, [D]knockin' on heaven's [C]door
+""",
+            1,
+            now,
+            now,
+        ),
+        (
             "Wish You Were Here (Intro)",
             "Pink Floyd",
             "Standard (E A D G B E)",
@@ -81,9 +141,11 @@ D|---0h2---2p0-------|---0h2---2p0-------|
 A|-------------2-----|-------------------|
 E|-------------------|---3---------------|
 
-[Chords for Verse / Solo Backing]
-C   D   Am   G
-C   D   Am   G
+[Verse]
+So, [C]so you think you can [D]tell
+Heaven from [Am]hell, blue skies from [G]pain
+Can you tell a green [D]field from a cold steel [C]rail?
+A smile from a [Am]veil? Do you think you can [G]tell?
 """,
             1,
             now,
