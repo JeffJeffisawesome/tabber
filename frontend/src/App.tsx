@@ -59,10 +59,15 @@ export const App: React.FC = () => {
     }
   }, [searchQuery, activeFilter]);
 
-  // Initial load and health check
+  // Initial load, health check, and realtime listener
   useEffect(() => {
     checkHealth();
-  }, [checkHealth]);
+    // Subscribe to realtime database changes (syncs live across devices/windows)
+    const unsubscribe = api.subscribeToTabs(() => {
+      fetchTabs();
+    });
+    return () => unsubscribe();
+  }, [checkHealth, fetchTabs]);
 
   // Refetch when search query or filter changes
   useEffect(() => {
@@ -137,10 +142,20 @@ export const App: React.FC = () => {
         </div>
 
         <div className="navbar-right">
-          <div className="health-status" title={health ? `API v${health.version}` : 'Backend offline'}>
-            <span className={`status-dot ${health?.status === 'ok' ? 'online' : 'offline'}`} />
+          <div
+            className="health-status"
+            title={
+              health?.database === 'supabase'
+                ? 'Connected directly to Supabase cloud database with live sync'
+                : 'Running in Local Storage demo mode. Add VITE_SUPABASE_URL in frontend/.env to connect to cloud'
+            }
+          >
+            <span
+              className={`status-dot ${health?.database === 'supabase' ? 'online' : 'offline'}`}
+              style={{ backgroundColor: health?.database === 'supabase' ? '#10b981' : '#f59e0b' }}
+            />
             <span className="status-label">
-              {health?.status === 'ok' ? 'Database Connected' : 'Connecting to API...'}
+              {health?.database === 'supabase' ? '☁️ Supabase Cloud (Live)' : '💾 Local Storage (Demo)'}
             </span>
           </div>
 

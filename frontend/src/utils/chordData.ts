@@ -310,7 +310,6 @@ export function extractChordsFromSong(content: string): string[] {
 
   // 2. Also match chords in standard chord lines (e.g. "C   G   Am   F")
   const lines = content.split('\n');
-  const chordTokenRegex = /\b([A-G][b#]?(?:m|maj|min|dim|aug|sus|add)?[0-9]?(?:\/[A-G][b#]?)?)\b/g;
 
   for (const line of lines) {
     const trimmed = line.trim();

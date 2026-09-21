@@ -9,6 +9,7 @@ class HealthResponse(BaseModel):
     """System health status response schema."""
     status: str = Field(..., description="Service status indicator, typically 'ok'")
     version: str = Field(..., description="API version")
+    database: str = Field(..., description="Active database engine: 'supabase' or 'sqlite'")
     timestamp: datetime = Field(..., description="Current server UTC timestamp")
 
 
