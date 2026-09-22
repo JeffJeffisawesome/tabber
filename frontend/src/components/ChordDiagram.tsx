@@ -1,81 +1,143 @@
-import React from 'react';
-import { getChordDefinition, type ChordDef } from '../utils/chordData';
+import React, { useState } from 'react';
+import { getChordVoicings, type ChordDef } from '../utils/chordData';
+
+export type ChordDiagramSize = 'compact' | 'standard' | 'large';
 
 interface ChordDiagramProps {
   chord: string | ChordDef;
+  size?: ChordDiagramSize;
   width?: number;
   height?: number;
   isHighlighted?: boolean;
+  selectedVoicingIndex?: number;
+  onVoicingChange?: (index: number) => void;
   onClick?: () => void;
 }
 
 export const ChordDiagram: React.FC<ChordDiagramProps> = ({
   chord,
-  width = 120,
-  height = 145,
+  size = 'standard',
+  width: customWidth,
+  height: customHeight,
   isHighlighted = false,
+  selectedVoicingIndex,
+  onVoicingChange,
   onClick,
 }) => {
-  const chordDef: ChordDef | null =
-    typeof chord === 'string' ? getChordDefinition(chord) : chord;
+  const [internalVoicingIndex, setInternalVoicingIndex] = useState<number>(0);
 
   const chordName = typeof chord === 'string' ? chord : chord.name;
+  const voicings = typeof chord === 'string' ? getChordVoicings(chord) : [chord];
+
+  // Determine active voicing index
+  const activeIndex =
+    selectedVoicingIndex !== undefined
+      ? Math.max(0, Math.min(selectedVoicingIndex, voicings.length - 1))
+      : Math.max(0, Math.min(internalVoicingIndex, voicings.length - 1));
+
+  const chordDef: ChordDef | undefined = voicings[activeIndex];
+
+  const handlePrevVoicing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextIdx = activeIndex > 0 ? activeIndex - 1 : voicings.length - 1;
+    if (onVoicingChange) {
+      onVoicingChange(nextIdx);
+    } else {
+      setInternalVoicingIndex(nextIdx);
+    }
+  };
+
+  const handleNextVoicing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextIdx = activeIndex < voicings.length - 1 ? activeIndex + 1 : 0;
+    if (onVoicingChange) {
+      onVoicingChange(nextIdx);
+    } else {
+      setInternalVoicingIndex(nextIdx);
+    }
+  };
+
+  // Dimensions based on size preset
+  const defaultDimensions = {
+    compact: { width: 76, height: 96 },
+    standard: { width: 110, height: 138 },
+    large: { width: 140, height: 175 },
+  }[size];
+
+  const width = customWidth || defaultDimensions.width;
+  const height = customHeight || defaultDimensions.height;
 
   if (!chordDef) {
     return (
-      <div className={`chord-fallback-card ${isHighlighted ? 'highlighted' : ''}`} onClick={onClick}>
+      <div
+        className={`chord-fallback-card ${size} ${isHighlighted ? 'highlighted' : ''}`}
+        onClick={onClick}
+      >
         <div className="chord-fallback-name">{chordName}</div>
         <div className="chord-fallback-label">(Chord)</div>
       </div>
     );
   }
 
-  // Layout metrics
-  const startX = 26; // X coordinate of String 6 (low E)
-  const stringSpacing = 14; // Horizontal distance between strings
-  const startY = 36; // Y coordinate of Nut / top fret wire
-  const fretHeight = 18; // Vertical distance between frets
+  // Layout metrics (matches viewBox 0 0 120 145)
+  const startX = 26; // X of String 6 (low E)
+  const stringSpacing = 14;
+  const startY = 36;
+  const fretHeight = 18;
   const numFrets = 5;
 
-  const totalGridWidth = stringSpacing * 5; // 70px (from X=26 to X=96)
+  const totalGridWidth = stringSpacing * 5; // 70px
   const totalGridHeight = fretHeight * numFrets; // 90px
 
   const { frets, baseFret, barres } = chordDef;
 
-  // Calculate string X position (string index 0 to 5, low E to high e)
   const getStringX = (stringIndex: number) => startX + stringIndex * stringSpacing;
-
-  // Calculate fret center Y position (fret number 1 to 5 relative to baseFret)
   const getFretCenterY = (relFret: number) => startY + (relFret - 0.5) * fretHeight;
 
   return (
     <div
-      className={`chord-diagram-card ${isHighlighted ? 'highlighted' : ''}`}
+      className={`chord-diagram-card size-${size} ${isHighlighted ? 'highlighted' : ''}`}
       onClick={onClick}
-      title={`Chord fingering for ${chordName}`}
+      title={`${chordName} (${chordDef.label || `Variation ${activeIndex + 1}`})`}
     >
+      {/* Top Header Row with Name & Voicing Switcher */}
+      <div className="chord-card-top-bar">
+        <span className="chord-card-title">{chordName}</span>
+
+        {voicings.length > 1 && (
+          <div className="voicing-switcher" title="Switch chord fingering variation">
+            <button
+              type="button"
+              className="btn-voicing-arrow"
+              onClick={handlePrevVoicing}
+              title="Previous fingering"
+            >
+              ‹
+            </button>
+            <span className="voicing-page">
+              {activeIndex + 1}/{voicings.length}
+            </span>
+            <button
+              type="button"
+              className="btn-voicing-arrow"
+              onClick={handleNextVoicing}
+              title="Next fingering"
+            >
+              ›
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* SVG Fretboard Diagram */}
       <svg
-        viewBox="0 0 120 145"
+        viewBox="0 0 120 135"
         width={width}
         height={height}
         className="chord-svg"
       >
-        {/* Chord Name Header */}
-        <text
-          x="60"
-          y="18"
-          textAnchor="middle"
-          className="chord-title-text"
-          fontWeight="bold"
-          fontSize="15"
-          fill="currentColor"
-        >
-          {chordName}
-        </text>
-
-        {/* Fretboard Nut / Top Wire */}
+        {/* Nut vs. Base Fret Indicator */}
         {baseFret === 1 ? (
-          // Thick Nut for open position chords
           <rect
             x={startX - 1}
             y={startY - 3}
@@ -85,7 +147,6 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
             rx="1"
           />
         ) : (
-          // Base fret number displayed on the left
           <text
             x={startX - 10}
             y={startY + 13}
@@ -127,13 +188,12 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
           />
         ))}
 
-        {/* Open ('o') and Muted ('x') String Markers */}
+        {/* Open ('o') and Muted ('✕') String Markers */}
         {frets.map((fretVal, stringIdx) => {
           const x = getStringX(stringIdx);
           const y = startY - 8;
 
           if (fretVal === -1) {
-            // Muted string 'x'
             return (
               <text
                 key={`mute-${stringIdx}`}
@@ -150,7 +210,6 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
             );
           }
           if (fretVal === 0) {
-            // Open string 'o'
             return (
               <circle
                 key={`open-${stringIdx}`}
@@ -167,9 +226,8 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
           return null;
         })}
 
-        {/* Barre Lines (matching the thick barre in the reference image) */}
+        {/* Barre Lines */}
         {barres?.map((barre, idx) => {
-          // fromString: 6 = low E (index 0), 1 = high e (index 5)
           const fromIndex = 6 - barre.fromString;
           const toIndex = 6 - barre.toString;
           const leftX = getStringX(Math.min(fromIndex, toIndex));
@@ -194,7 +252,6 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
         {/* Finger Placement Dots */}
         {frets.map((fretVal, stringIdx) => {
           if (fretVal <= 0) return null;
-          // Calculate relative fret offset
           const relFret = fretVal - (baseFret - 1);
           if (relFret < 1 || relFret > numFrets) return null;
 
@@ -212,9 +269,13 @@ export const ChordDiagram: React.FC<ChordDiagramProps> = ({
           );
         })}
       </svg>
+
+      {/* Variation Label (e.g. "Open" or "Barre 5th fret") */}
+      {chordDef.label && (
+        <div className="chord-variation-label">{chordDef.label}</div>
+      )}
     </div>
   );
 };
 
 export default ChordDiagram;
-
