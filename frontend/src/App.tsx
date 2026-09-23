@@ -3,11 +3,15 @@ import { api } from './services/api';
 import type { GuitarTab, TabCreate, HealthResponse } from './types/api';
 import TabViewer from './components/TabViewer';
 import TabEditorModal from './components/TabEditorModal';
+import LoginModal from './components/LoginModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
 
 const FILTER_DIFFICULTIES = ['All', 'Favorites', 'Beginner', 'Intermediate', 'Advanced'] as const;
 
-export const App: React.FC = () => {
+const TabberApp: React.FC = () => {
+  const { user, isLoggedIn, openLoginModal, signOut } = useAuth();
+
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [tabs, setTabs] = useState<GuitarTab[]>([]);
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null);
@@ -82,8 +86,13 @@ export const App: React.FC = () => {
     return tabs.find((t) => t.id === selectedTabId) || null;
   }, [tabs, selectedTabId]);
 
-  // Handlers
+  // Handlers with strict authentication checks
   const handleSaveTab = async (payload: TabCreate) => {
+    if (!isLoggedIn) {
+      openLoginModal('Please log in to add or edit guitar tabs.');
+      return;
+    }
+
     if (editingTab) {
       const updated = await api.updateTab(editingTab.id, payload);
       setTabs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -96,6 +105,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteTab = async (id: number) => {
+    if (!isLoggedIn) {
+      openLoginModal('Please log in to delete guitar tabs.');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this guitar tab?')) {
       return;
     }
@@ -120,11 +134,19 @@ export const App: React.FC = () => {
   };
 
   const openNewTabModal = () => {
+    if (!isLoggedIn) {
+      openLoginModal('Please log in to store a new guitar tab.');
+      return;
+    }
     setEditingTab(null);
     setIsEditorOpen(true);
   };
 
   const openEditTabModal = (tab: GuitarTab) => {
+    if (!isLoggedIn) {
+      openLoginModal('Please log in to edit guitar tabs.');
+      return;
+    }
     setEditingTab(tab);
     setIsEditorOpen(true);
   };
@@ -142,6 +164,7 @@ export const App: React.FC = () => {
         </div>
 
         <div className="navbar-right">
+          {/* Cloud vs Local Health Badge */}
           <div
             className="health-status"
             title={
@@ -159,9 +182,51 @@ export const App: React.FC = () => {
             </span>
           </div>
 
+          {/* Store New Tab Button */}
           <button className="btn-primary btn-new-tab" onClick={openNewTabModal}>
             + Store New Tab
           </button>
+
+          {/* Authentication Badge & Controls */}
+          <div className="navbar-auth-section">
+            {isLoggedIn && user ? (
+              <div className="user-profile-badge">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name || 'User avatar'}
+                    className="user-avatar-img"
+                  />
+                ) : (
+                  <span className="user-avatar-placeholder">
+                    {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div className="user-profile-info">
+                  <span className="user-profile-name" title={user.email}>
+                    {user.name || user.email}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-logout"
+                  onClick={() => signOut()}
+                  title="Log out of your account"
+                >
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn-auth-login"
+                onClick={() => openLoginModal()}
+                title="Sign in with GitHub, Google, or Email"
+              >
+                🔑 Log In
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -272,6 +337,8 @@ export const App: React.FC = () => {
               onToggleFavorite={handleToggleFavorite}
               onEdit={openEditTabModal}
               onDelete={handleDeleteTab}
+              isLoggedIn={isLoggedIn}
+              onRequestLogin={openLoginModal}
             />
           ) : (
             <div className="empty-workspace">
@@ -294,7 +361,18 @@ export const App: React.FC = () => {
           onClose={() => setIsEditorOpen(false)}
         />
       )}
+
+      {/* Authentication Login Modal */}
+      <LoginModal />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <TabberApp />
+    </AuthProvider>
   );
 };
 

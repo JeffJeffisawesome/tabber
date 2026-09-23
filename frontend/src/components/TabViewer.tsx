@@ -9,6 +9,8 @@ interface TabViewerProps {
   onToggleFavorite: (id: number) => void;
   onEdit: (tab: GuitarTab) => void;
   onDelete: (id: number) => void;
+  isLoggedIn?: boolean;
+  onRequestLogin?: (message: string) => void;
 }
 
 export const TabViewer: React.FC<TabViewerProps> = ({
@@ -16,6 +18,8 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   onToggleFavorite,
   onEdit,
   onDelete,
+  isLoggedIn = false,
+  onRequestLogin,
 }) => {
   const [fontSize, setFontSize] = useState<number>(15);
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
@@ -144,12 +148,33 @@ export const TabViewer: React.FC<TabViewerProps> = ({
         </div>
 
         <div className="tab-viewer-actions">
-          <button className="btn-secondary" onClick={() => onEdit(tab)}>
-            ✏️ Edit
-          </button>
-          <button className="btn-danger-outline" onClick={() => onDelete(tab.id)}>
-            🗑️ Delete
-          </button>
+          {isLoggedIn ? (
+            <>
+              <button className="btn-secondary" onClick={() => onEdit(tab)} title="Edit tab details & chords">
+                ✏️ Edit
+              </button>
+              <button className="btn-danger-outline" onClick={() => onDelete(tab.id)} title="Delete this tab">
+                🗑️ Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn-secondary btn-locked-action"
+                onClick={() => onRequestLogin?.('Please sign in to edit guitar tabs.')}
+                title="Sign in required to edit this tab"
+              >
+                🔒 Edit
+              </button>
+              <button
+                className="btn-danger-outline btn-locked-action"
+                onClick={() => onRequestLogin?.('Please sign in to delete guitar tabs.')}
+                title="Sign in required to delete tabs"
+              >
+                🔒 Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
 
