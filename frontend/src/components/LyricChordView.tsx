@@ -6,6 +6,7 @@ interface LyricChordViewProps {
   fontSize: number;
   highlightedChord: string | null;
   onSelectChord: (chord: string) => void;
+  isMaximizeLyrics?: boolean;
 }
 
 interface Segment {
@@ -59,6 +60,17 @@ function isTabStaffLine(line: string): boolean {
   return /^[eEbBgGdDaA]\|/.test(trimmed) || /^[eEbBgGdDaA]\s*\|/.test(trimmed);
 }
 
+// Check if a line looks like chord markers directly over a tab staff (e.g. "   Em7                  G")
+function isTabChordOrBlankLine(line: string, nextLine?: string): boolean {
+  if (!nextLine) return false;
+  if (!isTabStaffLine(nextLine)) return false;
+  const trimmed = line.trim();
+  if (trimmed === '') return true;
+  // If line contains words that look like chords and no lyrics
+  const tokens = trimmed.split(/\s+/);
+  return tokens.every((t) => isChordSymbol(t));
+}
+
 // Check if a line is a section header like [Verse 1], [Chorus], [Intro]
 function isSectionHeader(line: string): boolean {
   const trimmed = line.trim();
@@ -72,6 +84,7 @@ export const LyricChordView: React.FC<LyricChordViewProps> = ({
   fontSize,
   highlightedChord,
   onSelectChord,
+  isMaximizeLyrics = false,
 }) => {
   const rawLines = content.split('\n');
 
@@ -94,8 +107,15 @@ export const LyricChordView: React.FC<LyricChordViewProps> = ({
 
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
+    const nextLine = i + 1 < rawLines.length ? rawLines[i + 1] : undefined;
 
-    if (isTabStaffLine(line)) {
+    if (isTabStaffLine(line) || (isTabChordOrBlankLine(line, nextLine) && currentTabLines.length === 0)) {
+      currentTabLines.push(line);
+      continue;
+    }
+
+    // Allow empty line between staves if another staff follows immediately
+    if (currentTabLines.length > 0 && line.trim() === '' && nextLine && (isTabStaffLine(nextLine) || isTabChordOrBlankLine(nextLine, rawLines[i + 2]))) {
       currentTabLines.push(line);
       continue;
     }
@@ -118,7 +138,7 @@ export const LyricChordView: React.FC<LyricChordViewProps> = ({
   flushTabBlock();
 
   return (
-    <div className="lyric-chord-display" style={{ fontSize: `${fontSize}px` }}>
+    <div className={`lyric-chord-display ${isMaximizeLyrics ? 'maximized-view' : ''}`} style={{ fontSize: `${fontSize}px` }}>
       {blocks.map((block, idx) => {
         if (block.type === 'header') {
           return (
@@ -129,6 +149,23 @@ export const LyricChordView: React.FC<LyricChordViewProps> = ({
         }
 
         if (block.type === 'tab') {
+          if (isMaximizeLyrics) {
+            return (
+              <details key={`tab-${idx}`} className="tab-fingerings-accordion">
+                <summary className="tab-fingerings-summary">
+                  <span className="fingerings-icon">🎸</span>
+                  <span className="fingerings-title">Guitar Tab Fingerings / Riff</span>
+                  <span className="fingerings-badge">Tap to expand</span>
+                </summary>
+                <div className="tab-fingerings-inner">
+                  <pre className="tab-staff-pre accordion-pre">
+                    {block.lines.join('\n')}
+                  </pre>
+                </div>
+              </details>
+            );
+          }
+
           return (
             <pre key={`tab-${idx}`} className="tab-staff-pre">
               {block.lines.join('\n')}
