@@ -1,4 +1,5 @@
 import React from 'react';
+import { isChordSymbol } from '../utils/chordData';
 
 interface LyricChordViewProps {
   content: string;
@@ -14,17 +15,21 @@ interface Segment {
 
 /**
  * Parse a single ChordPro line into chord+text segments.
- * e.g. "[G]Almost [D]heaven, [Em]West Virginia"
+ * e.g. "[G]Almost [D]heaven, [Em]West Virginia, [Am7]Blue Ridge"
  */
 function parseChordProLine(line: string): Segment[] {
   const segments: Segment[] = [];
-  const regex = /\[([A-G][b#]?(?:m|maj|min|dim|aug|sus|add)?[0-9]?(?:\/[A-G][b#]?)?)\]/g;
+  const regex = /\[([^\]]+)\]/g;
 
   let lastIndex = 0;
   let currentChord: string | undefined = undefined;
   let match;
 
   while ((match = regex.exec(line)) !== null) {
+    const rawTag = match[1].trim();
+    if (!isChordSymbol(rawTag)) {
+      continue;
+    }
     const textBefore = line.substring(lastIndex, match.index);
     if (textBefore.length > 0 || currentChord !== undefined) {
       segments.push({
@@ -32,7 +37,7 @@ function parseChordProLine(line: string): Segment[] {
         text: textBefore,
       });
     }
-    currentChord = match[1];
+    currentChord = rawTag;
     lastIndex = regex.lastIndex;
   }
 

@@ -5,6 +5,7 @@
 export interface HealthResponse {
   status: string;
   version: string;
+  database: 'supabase' | 'sqlite' | string;
   timestamp: string;
 }
 

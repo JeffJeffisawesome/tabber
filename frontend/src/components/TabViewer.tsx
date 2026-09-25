@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { GuitarTab } from '../types/api';
 import { extractChordsFromSong } from '../utils/chordData';
-import ChordDiagram from './ChordDiagram';
+import ChordDiagram, { type ChordDiagramSize } from './ChordDiagram';
 import LyricChordView from './LyricChordView';
 
 interface TabViewerProps {
@@ -9,6 +9,8 @@ interface TabViewerProps {
   onToggleFavorite: (id: number) => void;
   onEdit: (tab: GuitarTab) => void;
   onDelete: (id: number) => void;
+  isLoggedIn?: boolean;
+  onRequestLogin?: (message: string) => void;
 }
 
 export const TabViewer: React.FC<TabViewerProps> = ({
@@ -16,6 +18,8 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   onToggleFavorite,
   onEdit,
   onDelete,
+  isLoggedIn = false,
+  onRequestLogin,
 }) => {
   const [fontSize, setFontSize] = useState<number>(15);
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
@@ -24,8 +28,29 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   const [showChordSidebar, setShowChordSidebar] = useState<boolean>(true);
   const [highlightedChord, setHighlightedChord] = useState<string | null>(null);
 
+  // Default to compact so chords can easily be seen all at once
+  const [sidebarChordSize, setSidebarChordSize] = useState<ChordDiagramSize>(() => {
+    try {
+      return (localStorage.getItem('tabber_chord_size') as ChordDiagramSize) || 'compact';
+    } catch {
+      return 'compact';
+    }
+  });
+
+  // Track the chosen voicing variation for each chord in the active tab
+  const [chordVoicings, setChordVoicings] = useState<Record<string, number>>({});
+
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollIntervalRef = useRef<number | null>(null);
+
+  const handleSizeChange = (newSize: ChordDiagramSize) => {
+    setSidebarChordSize(newSize);
+    try {
+      localStorage.setItem('tabber_chord_size', newSize);
+    } catch {
+      // Ignore
+    }
+  };
 
   // Extract all unique chords present in this song
   const uniqueChords = useMemo(() => {
@@ -80,10 +105,16 @@ export const TabViewer: React.FC<TabViewerProps> = ({
 
   const handleChordSelect = (chord: string) => {
     setHighlightedChord(chord);
-    // Make sure chord sidebar is open when user clicks a chord
     if (!showChordSidebar) {
       setShowChordSidebar(true);
     }
+  };
+
+  const handleVoicingChange = (chordName: string, newIndex: number) => {
+    setChordVoicings((prev) => ({
+      ...prev,
+      [chordName]: newIndex,
+    }));
   };
 
   return (
@@ -117,12 +148,33 @@ export const TabViewer: React.FC<TabViewerProps> = ({
         </div>
 
         <div className="tab-viewer-actions">
-          <button className="btn-secondary" onClick={() => onEdit(tab)}>
-            ✏️ Edit
-          </button>
-          <button className="btn-danger-outline" onClick={() => onDelete(tab.id)}>
-            🗑️ Delete
-          </button>
+          {isLoggedIn ? (
+            <>
+              <button className="btn-secondary" onClick={() => onEdit(tab)} title="Edit tab details & chords">
+                ✏️ Edit
+              </button>
+              <button className="btn-danger-outline" onClick={() => onDelete(tab.id)} title="Delete this tab">
+                🗑️ Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn-secondary btn-locked-action"
+                onClick={() => onRequestLogin?.('Please sign in to edit guitar tabs.')}
+                title="Sign in required to edit this tab"
+              >
+                🔒 Edit
+              </button>
+              <button
+                className="btn-danger-outline btn-locked-action"
+                onClick={() => onRequestLogin?.('Please sign in to delete guitar tabs.')}
+                title="Sign in required to delete tabs"
+              >
+                🔒 Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -155,7 +207,6 @@ export const TabViewer: React.FC<TabViewerProps> = ({
 
         {/* Font Zoom, Chord Panel Toggle & Copy */}
         <div className="utility-group">
-          {/* Chord Panel Toggle */}
           <button
             className={`btn-tiny btn-chord-toggle ${showChordSidebar ? 'active' : ''}`}
             onClick={() => setShowChordSidebar(!showChordSidebar)}
@@ -203,12 +254,41 @@ export const TabViewer: React.FC<TabViewerProps> = ({
 
         {/* Right: SVG Guitar Chord Diagrams Panel */}
         {showChordSidebar && (
-          <aside className="chord-sidebar">
+          <aside className={`chord-sidebar size-${sidebarChordSize}`}>
             <div className="chord-sidebar-header">
               <div className="chord-sidebar-title">
-                <span>🎸 Chord Fingerings</span>
+                <span>🎸 Chords</span>
                 <span className="chord-count-tag">{uniqueChords.length}</span>
               </div>
+
+              {/* Sizing Controls: S (Compact), M (Standard), L (Large) */}
+              <div className="size-selector-group" title="Chord size: S (compact fits all), M (standard), L (large)">
+                <button
+                  type="button"
+                  className={`btn-size-chip ${sidebarChordSize === 'compact' ? 'active' : ''}`}
+                  onClick={() => handleSizeChange('compact')}
+                  title="Small / Compact (see all chords at once)"
+                >
+                  S
+                </button>
+                <button
+                  type="button"
+                  className={`btn-size-chip ${sidebarChordSize === 'standard' ? 'active' : ''}`}
+                  onClick={() => handleSizeChange('standard')}
+                  title="Medium / Standard"
+                >
+                  M
+                </button>
+                <button
+                  type="button"
+                  className={`btn-size-chip ${sidebarChordSize === 'large' ? 'active' : ''}`}
+                  onClick={() => handleSizeChange('large')}
+                  title="Large"
+                >
+                  L
+                </button>
+              </div>
+
               <button
                 className="btn-close-sidebar"
                 onClick={() => setShowChordSidebar(false)}
@@ -218,7 +298,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
               </button>
             </div>
 
-            <div className="chord-diagrams-scroll">
+            <div className={`chord-diagrams-scroll size-${sidebarChordSize}`}>
               {uniqueChords.length === 0 ? (
                 <div className="chord-sidebar-empty">
                   <p>No standard chords detected in this tab.</p>
@@ -231,8 +311,9 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                   <ChordDiagram
                     key={chordName}
                     chord={chordName}
-                    width={115}
-                    height={140}
+                    size={sidebarChordSize}
+                    selectedVoicingIndex={chordVoicings[chordName] ?? 0}
+                    onVoicingChange={(newIdx) => handleVoicingChange(chordName, newIdx)}
                     isHighlighted={highlightedChord === chordName}
                     onClick={() => setHighlightedChord(chordName)}
                   />
