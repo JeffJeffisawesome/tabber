@@ -1,16 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from './services/api';
 import type { GuitarTab, TabCreate, HealthResponse } from './types/api';
 import TabViewer from './components/TabViewer';
 import TabEditorModal from './components/TabEditorModal';
 import LoginModal from './components/LoginModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import useIsMobile from './hooks/useIsMobile';
 import './App.css';
 
 const FILTER_DIFFICULTIES = ['All', 'Favorites', 'Beginner', 'Intermediate', 'Advanced'] as const;
 
+const DEFAULT_SIDEBAR_WIDTH = 320;
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 550;
+
 const TabberApp: React.FC = () => {
   const { user, isLoggedIn, openLoginModal, signOut } = useAuth();
+  const isMobile = useIsMobile();
 
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [tabs, setTabs] = useState<GuitarTab[]>([]);
@@ -19,6 +25,93 @@ const TabberApp: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Mobile View Switcher: 'list' (browsing & search) vs. 'reader' (full-screen tab viewer)
+  const [mobileView, setMobileView] = useState<'list' | 'reader'>('list');
+
+  // Mobile 'Maximize Lyrics' focus mode setting (hides mobile navbar to maximize screen for lyrics)
+  const [isMobileLyricsMaximized, setIsMobileLyricsMaximized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('tabber_mobile_maximize_lyrics') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Resizable sidebar width (separate persisted widths for desktop vs mobile)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const storageKey = isMobile ? 'tabber_mobile_sidebar_width' : 'tabber_sidebar_width';
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 50) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return isMobile ? 140 : DEFAULT_SIDEBAR_WIDTH;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  const sidebarDragStateRef = useRef({ startX: 0, startWidth: 0, currentWidth: 0 });
+
+  // Pointer Events: Works 100% reliably on iPhone Safari touch, iPad, and desktop mouse!
+  const handlePointerDownSidebar = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingSidebar(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidthRef.current;
+    sidebarDragStateRef.current = { startX, startWidth, currentWidth: startWidth };
+  };
+
+  const handlePointerMoveSidebar = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isResizingSidebar) return;
+    e.preventDefault();
+    const { startX, startWidth } = sidebarDragStateRef.current;
+    const deltaX = e.clientX - startX;
+    const minAllowed = isMobile ? 60 : MIN_SIDEBAR_WIDTH;
+    const maxAllowed = isMobile ? Math.max(140, window.innerWidth - 60) : MAX_SIDEBAR_WIDTH;
+    const nextWidth = Math.min(maxAllowed, Math.max(minAllowed, startWidth + deltaX));
+    sidebarDragStateRef.current.currentWidth = nextWidth;
+    setSidebarWidth(nextWidth);
+  };
+
+  const handlePointerUpSidebar = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isResizingSidebar) return;
+    setIsResizingSidebar(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore
+    }
+    const finalWidth = sidebarDragStateRef.current.currentWidth;
+    try {
+      const storageKey = isMobile ? 'tabber_mobile_sidebar_width' : 'tabber_sidebar_width';
+      localStorage.setItem(storageKey, String(finalWidth));
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleResetSidebarWidth = () => {
+    const defaultWidth = isMobile ? 140 : DEFAULT_SIDEBAR_WIDTH;
+    setSidebarWidth(defaultWidth);
+    try {
+      const storageKey = isMobile ? 'tabber_mobile_sidebar_width' : 'tabber_sidebar_width';
+      localStorage.setItem(storageKey, String(defaultWidth));
+    } catch {
+      // Ignore
+    }
+  };
 
   // Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
@@ -48,7 +141,7 @@ const TabberApp: React.FC = () => {
       const data = await api.getTabs(filterParams);
       setTabs(data);
 
-      // Default select the first tab if none selected or if previous selected tab was removed
+      // Default select the first tab if none selected
       if (data.length > 0) {
         setSelectedTabId((currentId) =>
           currentId && data.some((t) => t.id === currentId) ? currentId : data[0].id
@@ -97,10 +190,12 @@ const TabberApp: React.FC = () => {
       const updated = await api.updateTab(editingTab.id, payload);
       setTabs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setSelectedTabId(updated.id);
+      if (isMobile) setMobileView('reader');
     } else {
       const created = await api.createTab(payload);
       setTabs((prev) => [created, ...prev]);
       setSelectedTabId(created.id);
+      if (isMobile) setMobileView('reader');
     }
   };
 
@@ -118,6 +213,7 @@ const TabberApp: React.FC = () => {
       setTabs((prev) => prev.filter((t) => t.id !== id));
       if (selectedTabId === id) {
         setSelectedTabId(null);
+        if (isMobile) setMobileView('list');
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete guitar tab');
@@ -151,13 +247,24 @@ const TabberApp: React.FC = () => {
     setIsEditorOpen(true);
   };
 
+  const handleSelectTab = (tabId: number) => {
+    setSelectedTabId(tabId);
+    if (isMobile) {
+      setMobileView('reader');
+    }
+  };
+
   return (
-    <div className="tabber-app">
+    <div
+      className={`tabber-app ${
+        isMobile && mobileView === 'reader' && isMobileLyricsMaximized ? 'mobile-lyrics-maximized' : ''
+      }`}
+    >
       {/* Top Navbar */}
       <header className="tabber-navbar">
         <div className="navbar-brand">
           <span className="brand-logo">🎸</span>
-          <div>
+          <div className="brand-text-group">
             <h1 className="brand-title">Tabber</h1>
             <p className="brand-subtitle">Find, store, and practice guitar tabs</p>
           </div>
@@ -178,13 +285,14 @@ const TabberApp: React.FC = () => {
               style={{ backgroundColor: health?.database === 'supabase' ? '#10b981' : '#f59e0b' }}
             />
             <span className="status-label">
-              {health?.database === 'supabase' ? '☁️ Supabase Cloud (Live)' : '💾 Local Storage (Demo)'}
+              {health?.database === 'supabase' ? '☁️ Supabase Cloud (Live)' : '💾 Local (Demo)'}
             </span>
           </div>
 
           {/* Store New Tab Button */}
-          <button className="btn-primary btn-new-tab" onClick={openNewTabModal}>
-            + Store New Tab
+          <button className="btn-primary btn-new-tab" onClick={openNewTabModal} title="Store a new tab">
+            <span className="btn-new-tab-text-full">+ Store New Tab</span>
+            <span className="btn-new-tab-text-compact">+ Tab</span>
           </button>
 
           {/* Authentication Badge & Controls */}
@@ -223,7 +331,7 @@ const TabberApp: React.FC = () => {
                 onClick={() => openLoginModal()}
                 title="Sign in with GitHub, Google, or Email"
               >
-                🔑 Log In
+                🔑 <span className="login-btn-text">Log In</span>
               </button>
             )}
           </div>
@@ -240,117 +348,153 @@ const TabberApp: React.FC = () => {
         </div>
       )}
 
-      {/* Search & Filter Toolbar */}
-      <div className="toolbar">
-        <div className="search-bar-wrapper">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Find tabs by song title, artist, or chords..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className="btn-clear-search" onClick={() => setSearchQuery('')}>
-              &times;
-            </button>
-          )}
-        </div>
 
-        <div className="filter-chips">
-          {FILTER_DIFFICULTIES.map((filter) => (
-            <button
-              key={filter}
-              className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
-              onClick={() => setActiveFilter(filter)}
-            >
-              {filter === 'Favorites' ? '⭐ Favorites' : filter}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Workspace (Sidebar List + Active Tab Viewer) */}
-      <div className="tabber-workspace">
-        {/* Sidebar / List */}
-        <aside className="tabs-sidebar">
-          <div className="sidebar-header">
-            <span className="tab-count-badge">
-              {tabs.length} {tabs.length === 1 ? 'Tab' : 'Tabs'} Found
-            </span>
+      {/* Search & Filter Toolbar (Shown on desktop or when mobile list view) */}
+      {(!isMobile || mobileView === 'list') && (
+        <div className="toolbar">
+          <div className="search-bar-wrapper">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Find tabs by song title, artist, or chords..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="btn-clear-search" onClick={() => setSearchQuery('')}>
+                &times;
+              </button>
+            )}
           </div>
 
-          {loading ? (
-            <div className="sidebar-state">Loading tabs...</div>
-          ) : tabs.length === 0 ? (
-            <div className="sidebar-state">
-              <p>No tabs match your search.</p>
-              <button className="btn-text-link" onClick={openNewTabModal} style={{ marginTop: '0.5rem' }}>
-                Store a new tab now
+          <div className="filter-chips">
+            {FILTER_DIFFICULTIES.map((filter) => (
+              <button
+                key={filter}
+                className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
+                onClick={() => setActiveFilter(filter)}
+              >
+                {filter === 'Favorites' ? '⭐ Favorites' : filter}
               </button>
-            </div>
-          ) : (
-            <ul className="tabs-list">
-              {tabs.map((tab) => {
-                const isSelected = tab.id === selectedTabId;
-                return (
-                  <li
-                    key={tab.id}
-                    className={`tab-list-item ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setSelectedTabId(tab.id)}
-                  >
-                    <div className="tab-list-main">
-                      <div className="tab-list-top">
-                        <strong className="tab-list-title">{tab.title}</strong>
-                        <button
-                          className={`btn-star-mini ${tab.is_favorite ? 'favorited' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleFavorite(tab.id);
-                          }}
-                          title={tab.is_favorite ? 'Favorited' : 'Add to favorites'}
-                        >
-                          ★
-                        </button>
-                      </div>
-                      <span className="tab-list-artist">{tab.artist}</span>
-                      <div className="tab-list-meta">
-                        <span className={`pill-diff pill-${tab.difficulty.toLowerCase()}`}>
-                          {tab.difficulty}
-                        </span>
-                        {tab.capo > 0 && <span className="pill-capo">Capo {tab.capo}</span>}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </aside>
+            ))}
+          </div>
+        </div>
+      )}
 
-        {/* Tab Reader & Practice Viewer */}
-        <main className="tab-main-view">
-          {activeTab ? (
-            <TabViewer
-              tab={activeTab}
-              onToggleFavorite={handleToggleFavorite}
-              onEdit={openEditTabModal}
-              onDelete={handleDeleteTab}
-              isLoggedIn={isLoggedIn}
-              onRequestLogin={openLoginModal}
-            />
-          ) : (
-            <div className="empty-workspace">
-              <div className="empty-illustration">🎸</div>
-              <h3>No Tab Selected</h3>
-              <p>Select a guitar tab from the left or search by song / artist to view.</p>
-              <button className="btn-primary" onClick={openNewTabModal} style={{ marginTop: '1rem' }}>
-                + Store New Tab
-              </button>
+      {/* Main Workspace */}
+      <div className={`tabber-workspace ${isResizingSidebar ? 'is-resizing' : ''}`}>
+        {/* Sidebar / Song List (Visible on desktop OR when mobileView === 'list') */}
+        {(!isMobile || mobileView === 'list') && (
+          <aside
+            className={`tabs-sidebar ${isMobile ? 'mobile-full' : ''} ${isResizingSidebar ? 'resizing' : ''}`}
+            style={!isMobile ? { width: `${sidebarWidth}px`, flexShrink: 0 } : undefined}
+          >
+            <div className="sidebar-header">
+              <span className="tab-count-badge">
+                {tabs.length} {tabs.length === 1 ? 'Tab' : 'Tabs'} Found
+              </span>
             </div>
-          )}
-        </main>
+
+            {loading ? (
+              <div className="sidebar-state">Loading tabs...</div>
+            ) : tabs.length === 0 ? (
+              <div className="sidebar-state">
+                <p>No tabs match your search.</p>
+                <button className="btn-text-link" onClick={openNewTabModal} style={{ marginTop: '0.5rem' }}>
+                  Store a new tab now
+                </button>
+              </div>
+            ) : (
+              <ul className="tabs-list">
+                {tabs.map((tab) => {
+                  const isSelected = tab.id === selectedTabId;
+                  return (
+                    <li
+                      key={tab.id}
+                      className={`tab-list-item ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleSelectTab(tab.id)}
+                    >
+                      <div className="tab-list-main">
+                        <div className="tab-list-top">
+                          <strong className="tab-list-title">{tab.title}</strong>
+                          <button
+                            className={`btn-star-mini ${tab.is_favorite ? 'favorited' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(tab.id);
+                            }}
+                            title={tab.is_favorite ? 'Favorited' : 'Add to favorites'}
+                          >
+                            ★
+                          </button>
+                        </div>
+                        <span className="tab-list-artist">{tab.artist}</span>
+                        <div className="tab-list-meta">
+                          <span className={`pill-diff pill-${tab.difficulty.toLowerCase()}`}>
+                            {tab.difficulty}
+                          </span>
+                          {tab.capo > 0 && <span className="pill-capo">Capo {tab.capo}</span>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </aside>
+        )}
+
+        {/* Draggable Divider (Left: Visible on desktop) */}
+        {!isMobile && (
+          <div
+            className={`split-resizer left-resizer ${isResizingSidebar ? 'resizing' : ''}`}
+            onPointerDown={handlePointerDownSidebar}
+            onPointerMove={handlePointerMoveSidebar}
+            onPointerUp={handlePointerUpSidebar}
+            onPointerCancel={handlePointerUpSidebar}
+            onDoubleClick={handleResetSidebarWidth}
+            title="Drag to resize song list (Double-click to reset)"
+            role="separator"
+            aria-orientation="vertical"
+          >
+            <div className="resizer-handle-pill" />
+          </div>
+        )}
+
+        {/* Tab Reader & Practice Viewer (Visible on desktop OR when mobileView === 'reader') */}
+        {(!isMobile || mobileView === 'reader') && (
+          <main className={`tab-main-view ${isMobile ? 'mobile-full' : ''}`}>
+            {activeTab ? (
+              <TabViewer
+                tab={activeTab}
+                onToggleFavorite={handleToggleFavorite}
+                onEdit={openEditTabModal}
+                onDelete={handleDeleteTab}
+                isLoggedIn={isLoggedIn}
+                onRequestLogin={openLoginModal}
+                onBackToList={isMobile ? () => setMobileView('list') : undefined}
+                isMobile={isMobile}
+                onToggleMaximizeLyrics={(maximized) => setIsMobileLyricsMaximized(maximized)}
+              />
+            ) : (
+              <div className="empty-workspace">
+                <div className="empty-illustration">🎸</div>
+                <h3>No Tab Selected</h3>
+                <p>Select a guitar tab to start practicing.</p>
+                {isMobile ? (
+                  <button className="btn-primary" onClick={() => setMobileView('list')} style={{ marginTop: '1rem' }}>
+                    Browse All Tabs
+                  </button>
+                ) : (
+                  <button className="btn-primary" onClick={openNewTabModal} style={{ marginTop: '1rem' }}>
+                    + Store New Tab
+                  </button>
+                )}
+              </div>
+            )}
+          </main>
+        )}
       </div>
 
       {/* Editor Modal */}
