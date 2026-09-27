@@ -797,10 +797,31 @@
   font-size: 1em;
 }
 
+.plain-chord-line {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
+  white-space: pre-wrap;
+  line-height: 1.35;
+  margin-bottom: 0.2rem;
+  color: var(--primary);
+  font-weight: 700;
+  overflow-x: auto;
+}
+
 .plain-lyric-line {
   min-height: 1.4em;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
   color: #3b3026;
+  white-space: pre-wrap;
+}
+
+.plain-lyric-line.monospace-aligned {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
+}
+
+.plain-lyric-line.empty-line {
+  min-height: 1.2em;
+  height: 1.2em;
+  margin-bottom: 0;
 }
 
 .tab-staff-pre {
@@ -815,6 +836,33 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow-x: auto;
+}
+
+.tab-chord-line {
+  color: var(--primary);
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: pre;
+}
+
+.tab-chord-pill {
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 1px dashed var(--primary);
+}
+
+.tab-chord-pill:hover,
+.tab-chord-pill.active-chord {
+  background-color: #fef3c7;
+  color: #b45309;
+  border-radius: 2px;
+}
+
+.tab-staff-string {
+  white-space: pre;
+  line-height: 1.35;
 }
 
 /* Chord Diagrams Side Panel */
