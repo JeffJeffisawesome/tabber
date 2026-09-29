@@ -48,3 +48,29 @@ class Tab(TabBase):
 
     class Config:
         from_attributes = True
+
+
+class UGSearchResult(BaseModel):
+    """A search result item from Ultimate Guitar with ratings and votes."""
+    title: str = Field(..., description="Song title")
+    artist: str = Field(..., description="Artist name")
+    type: str = Field(..., description="Tab type: 'Chords', 'Tabs', etc.")
+    rating: float = Field(default=0.0, description="Average star rating (0.0 to 5.0)")
+    votes: int = Field(default=0, description="Total ratings or votes count")
+    url: str = Field(..., description="Direct URL to the tab")
+    version: int = Field(default=1, description="Version number")
+    is_top_pick: bool = Field(default=False, description="Flag indicating highest-rated community choice")
+
+
+class TabImportRequest(BaseModel):
+    """Request payload for importing a tab from an external URL."""
+    url: str = Field(..., min_length=5, description="URL of the tab to scrape and import")
+    save: bool = Field(default=False, description="Whether to persist directly to database")
+
+
+class TabImportResponse(BaseModel):
+    """Response payload containing parsed tab data and optionally saved tab."""
+    tab: TabCreate
+    saved_tab: Optional[Tab] = None
+
+

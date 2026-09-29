@@ -1,6 +1,7 @@
-import type { GuitarTab, TabCreate, TabUpdate, TabFilter, HealthResponse } from '../types/api';
+import type { GuitarTab, TabCreate, TabUpdate, TabFilter, HealthResponse, UGSearchResult, TabImportResponse, TabDifficulty } from '../types/api';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { STARTER_TABS } from './starterData';
+
 
 const LOCAL_STORAGE_KEY = 'tabber_guitar_tabs';
 
@@ -269,4 +270,177 @@ export const api = {
     const tabs = getLocalTabs();
     saveLocalTabs(tabs.filter((t) => t.id !== id));
   },
+
+  /**
+   * Search Ultimate Guitar for tabs ranked by community votes and rating score.
+   */
+  async searchWebTabs(query: string): Promise<UGSearchResult[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    // 1. Try backend search endpoint
+    try {
+      const res = await fetch(`/api/tabs/search-ug?q=${encodeURIComponent(trimmed)}`);
+      if (res.ok) {
+        const data: UGSearchResult[] = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Backend unavailable, fallback to direct proxy fetch
+    }
+
+    // 2. Client-side fallback via CORS proxy
+    try {
+      const ugUrl = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(trimmed)}`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ugUrl)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) return [];
+      const html = await res.text();
+      const match = html.match(/class="js-store" data-content="([^"]+)"/);
+      if (!match) return [];
+
+      const rawJson = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#039;/g, "'");
+      const parsed = JSON.parse(rawJson);
+      const rawResults = parsed?.store?.page?.data?.results || [];
+      const items: { model: UGSearchResult; score: number }[] = [];
+
+      for (const r of rawResults) {
+        if (!['Chords', 'Tabs', 'Bass', 'Ukulele'].includes(r.type)) continue;
+        const rating = Number(r.rating || 0);
+        const votes = Number(r.votes || 0);
+        const score = votes * (rating * rating);
+        items.push({
+          model: {
+            title: r.song_name || 'Unknown Title',
+            artist: r.artist_name || 'Unknown Artist',
+            type: r.type,
+            rating: Math.round(rating * 100) / 100,
+            votes,
+            url: r.tab_url || '',
+            version: Number(r.version || 1),
+            is_top_pick: false,
+          },
+          score,
+        });
+      }
+
+      items.sort((a, b) => b.score - a.score || b.model.votes - a.model.votes);
+      if (items.length > 0) {
+        items[0].model.is_top_pick = true;
+      }
+      return items.slice(0, 15).map((i) => i.model);
+    } catch (err) {
+      console.error('Client web search failed:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Import a tab from an Ultimate Guitar URL.
+   * Can either return parsed fields or automatically create and persist the tab.
+   */
+  async importTabFromUrl(url: string, autoSave: boolean = false): Promise<TabImportResponse> {
+    const trimmed = url.trim();
+    if (!trimmed) throw new Error('URL is required');
+
+    // 1. Try backend import endpoint
+    try {
+      const res = await fetch('/api/tabs/import-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed, save: autoSave }),
+      });
+      if (res.ok) {
+        const data: TabImportResponse = await res.json();
+        if (autoSave) {
+          if (data.saved_tab) {
+            const localTabs = getLocalTabs();
+            if (!localTabs.some((t) => t.id === data.saved_tab!.id)) {
+              saveLocalTabs([data.saved_tab, ...localTabs]);
+            }
+          } else {
+            // Save tab using active database client (Supabase or LocalStorage)
+            data.saved_tab = await this.createTab(data.tab);
+          }
+        }
+        return data;
+      } else {
+        const errorData = await res.json().catch(() => null);
+        if (errorData?.detail) {
+          throw new Error(errorData.detail);
+        }
+      }
+    } catch (e: any) {
+      if (e?.message && !e.message.includes('fetch')) {
+        throw e;
+      }
+      // If network failure to backend, continue to proxy fallback
+    }
+
+    // 2. Client-side fallback via CORS proxy
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(trimmed)}`;
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error('Failed to retrieve the tab webpage');
+    const html = await res.text();
+    const match = html.match(/class="js-store" data-content="([^"]+)"/);
+    if (!match) throw new Error('Could not parse tab structure from this webpage');
+
+    const rawJson = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#039;/g, "'");
+    const parsed = JSON.parse(rawJson);
+    const pageData = parsed?.store?.page?.data || {};
+    const tabInfo = pageData.tab || {};
+    const tabView = pageData.tab_view || {};
+    const meta = tabView.meta || {};
+
+    const rawContent: string = tabView?.wiki_tab?.content || '';
+    const cleanContent = rawContent
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&#039;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\[\/?(ch|tab)\]/g, '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+
+    if (!cleanContent) {
+      throw new Error('Tab content is empty or protected');
+    }
+
+    let difficulty: TabDifficulty = 'Intermediate';
+    const rawDiff = String(tabInfo.difficulty || meta.difficulty || '').toLowerCase();
+    if (rawDiff.includes('novice') || rawDiff.includes('beginner') || rawDiff.includes('easy')) {
+      difficulty = 'Beginner';
+    } else if (rawDiff.includes('advanced') || rawDiff.includes('expert') || rawDiff.includes('hard')) {
+      difficulty = 'Advanced';
+    }
+
+    let tuning = typeof meta.tuning === 'string' ? meta.tuning : (meta.tuning?.name || tabInfo.tuning || 'Standard (E A D G B E)');
+    if (tuning.toLowerCase().includes('standard')) {
+      tuning = 'Standard (E A D G B E)';
+    }
+
+    const capo = Math.max(0, Math.min(12, Number(meta.capo || tabInfo.capo || 0)));
+
+    const tabCreate: TabCreate = {
+      title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
+      artist: tabInfo.artist_name || pageData.artist_name || 'Unknown Artist',
+      tuning,
+      capo,
+      difficulty,
+      content: cleanContent,
+      is_favorite: false,
+    };
+
+    let savedTab: GuitarTab | null = null;
+    if (autoSave) {
+      savedTab = await api.createTab(tabCreate);
+    }
+
+    return { tab: tabCreate, saved_tab: savedTab };
+  },
 };
+

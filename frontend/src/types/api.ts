@@ -50,3 +50,20 @@ export interface TabFilter {
   favorite?: boolean;
   tuning?: string;
 }
+
+export interface UGSearchResult {
+  title: string;
+  artist: string;
+  type: string;
+  rating: number;
+  votes: number;
+  url: string;
+  version: number;
+  is_top_pick: boolean;
+}
+
+export interface TabImportResponse {
+  tab: TabCreate;
+  saved_tab?: GuitarTab | null;
+}
+

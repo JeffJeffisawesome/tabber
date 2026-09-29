@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
 import type { GuitarTab, TabCreate, TabDifficulty } from '../types/api';
+import { api } from '../services/api';
 
 interface TabEditorModalProps {
   initialTab?: GuitarTab | null;
+  initialTabCreate?: TabCreate | null;
   onSave: (data: TabCreate) => Promise<void>;
   onClose: () => void;
 }
@@ -43,25 +45,95 @@ const QUICK_CHORDS = ['G', 'C', 'D', 'Em', 'Am', 'F', 'A', 'E', 'Bm', 'Cadd9', '
 
 export const TabEditorModal: React.FC<TabEditorModalProps> = ({
   initialTab,
+  initialTabCreate,
   onSave,
   onClose,
 }) => {
   const isEditing = Boolean(initialTab);
 
-  const [title, setTitle] = useState(initialTab?.title || '');
-  const [artist, setArtist] = useState(initialTab?.artist || '');
-  const [tuning, setTuning] = useState(initialTab?.tuning || COMMON_TUNINGS[0]);
-  const [customTuning, setCustomTuning] = useState('');
-  const [capo, setCapo] = useState<number>(initialTab?.capo ?? 0);
-  const [difficulty, setDifficulty] = useState<TabDifficulty>(
-    initialTab?.difficulty || 'Intermediate'
+  const [title, setTitle] = useState(initialTab?.title || initialTabCreate?.title || '');
+  const [artist, setArtist] = useState(initialTab?.artist || initialTabCreate?.artist || '');
+  const [tuning, setTuning] = useState(
+    initialTab?.tuning || initialTabCreate?.tuning || COMMON_TUNINGS[0]
   );
-  const [content, setContent] = useState(initialTab?.content || CHORD_LYRIC_TEMPLATE);
-  const [isFavorite, setIsFavorite] = useState<boolean>(initialTab?.is_favorite ?? false);
+  const [customTuning, setCustomTuning] = useState('');
+  const [capo, setCapo] = useState<number>(initialTab?.capo ?? initialTabCreate?.capo ?? 0);
+  const [difficulty, setDifficulty] = useState<TabDifficulty>(
+    initialTab?.difficulty || initialTabCreate?.difficulty || 'Intermediate'
+  );
+  const [content, setContent] = useState(
+    initialTab?.content || initialTabCreate?.content || CHORD_LYRIC_TEMPLATE
+  );
+  const [isFavorite, setIsFavorite] = useState<boolean>(
+    initialTab?.is_favorite ?? initialTabCreate?.is_favorite ?? false
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Quick web import state
+  const [importInput, setImportInput] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<{
+    type: 'info' | 'success' | 'error';
+    message: string;
+  } | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleQuickImport = async () => {
+    const raw = importInput.trim();
+    if (!raw) return;
+
+    setIsImporting(true);
+    setImportStatus({ type: 'info', message: 'Searching & importing tab...' });
+    setError(null);
+
+    try {
+      let targetUrl = raw;
+      let topPickInfo = '';
+
+      if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        // Search by song name on Ultimate Guitar
+        setImportStatus({ type: 'info', message: `Searching Ultimate Guitar for "${raw}"...` });
+        const results = await api.searchWebTabs(raw);
+        if (!results || results.length === 0) {
+          throw new Error(`No tabs found for "${raw}". Try including the artist name.`);
+        }
+        // Top pick is sorted by votes * (rating ** 2)
+        const top = results[0];
+        targetUrl = top.url;
+        topPickInfo = ` (⭐ ${top.rating.toFixed(2)} rating · ${top.votes.toLocaleString()} votes)`;
+      }
+
+      setImportStatus({ type: 'info', message: 'Extracting chords and tab staves...' });
+      const imported = await api.importTabFromUrl(targetUrl, false);
+      const tab = imported.tab;
+
+      setTitle(tab.title);
+      setArtist(tab.artist);
+      setCapo(tab.capo);
+      setDifficulty(tab.difficulty);
+      if (COMMON_TUNINGS.includes(tab.tuning)) {
+        setTuning(tab.tuning);
+      } else {
+        setTuning('Custom');
+        setCustomTuning(tab.tuning);
+      }
+      setContent(tab.content);
+      setImportStatus({
+        type: 'success',
+        message: `Auto-filled "${tab.title}" by ${tab.artist}${topPickInfo}!`,
+      });
+    } catch (err: unknown) {
+      setImportStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Import failed.',
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +198,46 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
         {error && <div className="modal-error-banner">⚠️ {error}</div>}
 
         <form onSubmit={handleSubmit} className="modal-form">
+          {!isEditing && (
+            <div className="editor-quick-import-panel">
+              <div className="quick-import-header">
+                <span className="quick-import-title">🌐 Auto-Fill from Ultimate Guitar</span>
+                <span className="quick-import-tag">Top-Rated Search or Direct Link</span>
+              </div>
+              <div className="quick-import-input-row">
+                <input
+                  type="text"
+                  className="form-input quick-import-input"
+                  placeholder="Song & artist (e.g. Let Her Go Passenger) OR paste https://tabs.ultimate-guitar.com/..."
+                  value={importInput}
+                  onChange={(e) => setImportInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleQuickImport();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary quick-import-btn"
+                  disabled={isImporting || !importInput.trim()}
+                  onClick={handleQuickImport}
+                >
+                  {isImporting ? '⚡ Fetching...' : '⚡ Auto-Fill Form'}
+                </button>
+              </div>
+              {importStatus && (
+                <div className={`quick-import-status ${importStatus.type}`}>
+                  {importStatus.type === 'info' && '⏳ '}
+                  {importStatus.type === 'success' && '✅ '}
+                  {importStatus.type === 'error' && '⚠️ '}
+                  {importStatus.message}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="form-grid-2">
             <div className="form-group">
               <label htmlFor="tab-title">Song Title *</label>

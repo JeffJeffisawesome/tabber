@@ -3,10 +3,12 @@ import { api } from './services/api';
 import type { GuitarTab, TabCreate, HealthResponse } from './types/api';
 import TabViewer from './components/TabViewer';
 import TabEditorModal from './components/TabEditorModal';
+import { TabImportModal } from './components/TabImportModal';
 import LoginModal from './components/LoginModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import useIsMobile from './hooks/useIsMobile';
 import './App.css';
+
 
 const FILTER_DIFFICULTIES = ['All', 'Favorites', 'Beginner', 'Intermediate', 'Advanced'] as const;
 
@@ -113,9 +115,12 @@ const TabberApp: React.FC = () => {
     }
   };
 
-  // Editor Modal State
+  // Editor & Import Modal State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
   const [editingTab, setEditingTab] = useState<GuitarTab | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [editorInitialCreate, setEditorInitialCreate] = useState<TabCreate | null>(null);
+
 
   // Check backend health
   const checkHealth = useCallback(async () => {
@@ -235,6 +240,7 @@ const TabberApp: React.FC = () => {
       return;
     }
     setEditingTab(null);
+    setEditorInitialCreate(null);
     setIsEditorOpen(true);
   };
 
@@ -244,8 +250,10 @@ const TabberApp: React.FC = () => {
       return;
     }
     setEditingTab(tab);
+    setEditorInitialCreate(null);
     setIsEditorOpen(true);
   };
+
 
   const handleSelectTab = (tabId: number) => {
     setSelectedTabId(tabId);
@@ -294,6 +302,17 @@ const TabberApp: React.FC = () => {
             <span className="btn-new-tab-text-full">+ Store New Tab</span>
             <span className="btn-new-tab-text-compact">+ Tab</span>
           </button>
+
+          {/* Import Web Tab Button */}
+          <button
+            className="btn-secondary btn-import-tab"
+            onClick={() => setIsImportOpen(true)}
+            title="Search Ultimate Guitar or paste a tab link to import"
+          >
+            <span className="btn-import-tab-text-full">🌐 Import Web Tab</span>
+            <span className="btn-import-tab-text-compact">🌐 Import</span>
+          </button>
+
 
           {/* Authentication Badge & Controls */}
           <div className="navbar-auth-section">
@@ -501,10 +520,37 @@ const TabberApp: React.FC = () => {
       {isEditorOpen && (
         <TabEditorModal
           initialTab={editingTab}
+          initialTabCreate={editorInitialCreate}
           onSave={handleSaveTab}
-          onClose={() => setIsEditorOpen(false)}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setEditorInitialCreate(null);
+          }}
         />
       )}
+
+      {/* Web Tab Import Modal */}
+      {isImportOpen && (
+        <TabImportModal
+          onClose={() => setIsImportOpen(false)}
+          onImportSuccess={(savedTab) => {
+            setTabs((prev) => {
+              const filtered = prev.filter((t) => t.id !== savedTab.id);
+              return [savedTab, ...filtered];
+            });
+            setSelectedTabId(savedTab.id);
+            if (isMobile) setMobileView('reader');
+            setIsImportOpen(false);
+          }}
+          onOpenInEditor={(tabData) => {
+            setEditingTab(null);
+            setEditorInitialCreate(tabData);
+            setIsImportOpen(false);
+            setIsEditorOpen(true);
+          }}
+        />
+      )}
+
 
       {/* Authentication Login Modal */}
       <LoginModal />
