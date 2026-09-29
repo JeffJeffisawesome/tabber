@@ -12,11 +12,16 @@ from app.db import init_db
 from app.routers import health, tabs
 
 
+# Initialize database schemas and migrations
+init_db()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize SQLite database and seed starter guitar tabs on startup."""
+    """Ensure database is initialized on startup."""
     init_db()
     yield
+
 
 
 app = FastAPI(

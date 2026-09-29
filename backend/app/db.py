@@ -53,11 +53,8 @@ def get_sqlite_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Initialize the database. If Supabase is connected, checks connection. Otherwise initializes SQLite."""
-    client = get_supabase_client()
-    if client is not None:
-        logger.info("Using Supabase as primary database.")
-        return
+    """Initialize SQLite database (fallback) and check Supabase connection."""
+
 
     # Initialize SQLite fallback
     with get_sqlite_connection() as conn:
@@ -68,6 +65,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL,
+                version_name TEXT DEFAULT 'Chords',
                 tuning TEXT NOT NULL DEFAULT 'Standard (E A D G B E)',
                 capo INTEGER DEFAULT 0,
                 difficulty TEXT NOT NULL DEFAULT 'Intermediate',
@@ -78,10 +76,17 @@ def init_db() -> None:
             );
             """
         )
+        # Automatic SQLite migration: ensure version_name column exists
+        cursor.execute("PRAGMA table_info(tabs);")
+        existing_cols = [col[1] for col in cursor.fetchall()]
+        if "version_name" not in existing_cols:
+            cursor.execute("ALTER TABLE tabs ADD COLUMN version_name TEXT DEFAULT 'Chords';")
+
         cursor.execute("SELECT COUNT(*) as count FROM tabs;")
         if cursor.fetchone()["count"] == 0:
             seed_sqlite_tabs(cursor)
         conn.commit()
+
 
 
 def seed_sqlite_tabs(cursor: sqlite3.Cursor) -> None:
@@ -231,10 +236,18 @@ E|-------|-------------|-------|---------|
 
 def sqlite_row_to_tab(row) -> Tab:
     """Convert an SQLite Row to Tab schema."""
+    version_name = "Chords"
+    try:
+        if "version_name" in row.keys() and row["version_name"]:
+            version_name = str(row["version_name"])
+    except Exception:
+        pass
+
     return Tab(
         id=row["id"],
         title=row["title"],
         artist=row["artist"],
+        version_name=version_name,
         tuning=row["tuning"],
         capo=row["capo"],
         difficulty=row["difficulty"],
@@ -243,6 +256,7 @@ def sqlite_row_to_tab(row) -> Tab:
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )
+
 
 
 # =====================================================================
@@ -342,6 +356,7 @@ def create_tab_db(payload: TabCreate) -> Tab:
             record = {
                 "title": payload.title.strip(),
                 "artist": payload.artist.strip(),
+                "version_name": payload.version_name or "Chords",
                 "tuning": payload.tuning,
                 "capo": payload.capo,
                 "difficulty": payload.difficulty,
@@ -354,18 +369,29 @@ def create_tab_db(payload: TabCreate) -> Tab:
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
         except Exception as e:
-            logger.error(f"Supabase create_tab error: {e}. Falling back to SQLite.")
+            logger.warning(f"Supabase insert failed: {e}. Retrying without version_name...")
+            try:
+                compat_record = {k: v for k, v in record.items() if k != "version_name"}
+                res = client.table("tabs").insert(compat_record).execute()
+                if res.data and len(res.data) > 0:
+                    d = dict(res.data[0])
+                    d["version_name"] = payload.version_name or "Chords"
+                    return Tab(**d)
+            except Exception as e2:
+                logger.error(f"Supabase insert fallback failed: {e2}. Falling back to SQLite.")
+
 
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tabs (title, artist, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO tabs (title, artist, version_name, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 payload.title.strip(),
                 payload.artist.strip(),
+                payload.version_name or "Chords",
                 payload.tuning,
                 payload.capo,
                 payload.difficulty,
@@ -393,6 +419,8 @@ def update_tab_db(tab_id: int, payload: TabUpdate) -> Optional[Tab]:
         update_data["title"] = payload.title.strip()
     if payload.artist is not None:
         update_data["artist"] = payload.artist.strip()
+    if payload.version_name is not None:
+        update_data["version_name"] = payload.version_name.strip()
     if payload.tuning is not None:
         update_data["tuning"] = payload.tuning
     if payload.capo is not None:
@@ -411,6 +439,7 @@ def update_tab_db(tab_id: int, payload: TabUpdate) -> Optional[Tab]:
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
         except Exception as e:
+
             logger.error(f"Supabase update_tab error: {e}. Falling back to SQLite.")
 
     # SQLite fallback

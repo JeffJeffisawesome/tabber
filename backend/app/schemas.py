@@ -17,6 +17,7 @@ class TabBase(BaseModel):
     """Base schema for a guitar tablature."""
     title: str = Field(..., min_length=1, max_length=150, description="Song title")
     artist: str = Field(..., min_length=1, max_length=150, description="Artist or band name")
+    version_name: str = Field(default="Chords", max_length=50, description="Arrangement or version name (e.g. Chords, Tabs, Acoustic)")
     tuning: str = Field(default="Standard (E A D G B E)", max_length=50, description="Guitar tuning")
     capo: int = Field(default=0, ge=0, le=12, description="Capo fret position (0 = no capo)")
     difficulty: str = Field(default="Intermediate", max_length=20, description="Beginner, Intermediate, or Advanced")
@@ -33,11 +34,13 @@ class TabUpdate(BaseModel):
     """Payload schema for updating an existing guitar tab."""
     title: Optional[str] = Field(None, min_length=1, max_length=150)
     artist: Optional[str] = Field(None, min_length=1, max_length=150)
+    version_name: Optional[str] = Field(None, max_length=50)
     tuning: Optional[str] = Field(None, max_length=50)
     capo: Optional[int] = Field(None, ge=0, le=12)
     difficulty: Optional[str] = Field(None, max_length=20)
     content: Optional[str] = Field(None, min_length=1)
     is_favorite: Optional[bool] = None
+
 
 
 class Tab(TabBase):

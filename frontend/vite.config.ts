@@ -146,15 +146,21 @@ function ultimateGuitarPlugin(): Plugin {
 
         const capo = Math.max(0, Math.min(12, Number(meta.capo || tabInfo.capo || 0)));
 
+        const rawType = tabInfo.type_name || tabInfo.type || 'Chords';
+        const versionNum = tabInfo.version || 1;
+        const versionName = `${rawType} (Ver ${versionNum})`;
+
         const tabCreate = {
           title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
           artist: tabInfo.artist_name || pageData.artist_name || 'Unknown Artist',
+          version_name: versionName,
           tuning,
           capo,
           difficulty,
           content,
           is_favorite: false,
         };
+
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ tab: tabCreate, saved_tab: null }));

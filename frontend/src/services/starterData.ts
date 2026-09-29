@@ -7,6 +7,7 @@ export const STARTER_TABS: GuitarTab[] = [
     id: 1,
     title: 'Take Me Home, Country Roads',
     artist: 'John Denver',
+    version_name: 'Chords (Standard)',
     tuning: 'Standard (E A D G B E)',
     capo: 2,
     difficulty: 'Beginner',
@@ -42,6 +43,7 @@ That I [G]should have been home [D]yesterday, yester[D7]day
     id: 2,
     title: "Knockin' on Heaven's Door",
     artist: 'Bob Dylan',
+    version_name: 'Chords (Standard)',
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Beginner',
@@ -60,33 +62,32 @@ That I [G]should have been home [D]yesterday, yester[D7]day
 [G]Knock, knock, [D]knockin' on heaven's [C]door
 [G]Knock, knock, [D]knockin' on heaven's [Am]door
 [G]Knock, knock, [D]knockin' on heaven's [C]door
+
+[Verse 2]
+[G]Mama, put my [D]guns in the [Am]ground
+[G]I can't [D]shoot them any[C]more
+[G]That long black [D]cloud is comin' [Am]down
+[G]I feel I'm [D]knockin' on heaven's [C]door
 `,
-    is_favorite: true,
+    is_favorite: false,
     created_at: now,
     updated_at: now,
   },
   {
     id: 3,
-    title: 'Wish You Were Here (Intro)',
+    title: 'Wish You Were Here',
     artist: 'Pink Floyd',
+    version_name: 'Intro Riff & Chords',
     tuning: 'Standard (E A D G B E)',
     capo: 0,
-    difficulty: 'Beginner',
-    content: `[Intro Acoustic Riff]
+    difficulty: 'Intermediate',
+    content: `[Intro Riff]
 
    Em7                  G
-e|-------------------|-------------------|
+e|-------3-----------|-------3-----------|
 B|-------3-----------|-------3-----------|
 G|-------0-----------|-------0-----------|
-D|---0h2---2p0-------|---0h2---2p0-------|
-A|-------------2-----|-------------2-----|
-E|-------------------|---------------3---|
-
-   Em7                  A7sus4
-e|-------------------|-------------------|
-B|-------3-----------|-------3-----------|
-G|-------0-----------|-------0-----------|
-D|---0h2---2p0-------|---0h2---2p0-------|
+D|-------2-----------|-------0-----------|
 A|-------------2-----|-------------0-----|
 E|-------------------|-------------------|
 
@@ -110,8 +111,9 @@ A smile from a [Am]veil? Do you think you can [G]tell?
   },
   {
     id: 4,
-    title: 'Blackbird (Intro)',
+    title: 'Blackbird',
     artist: 'The Beatles',
+    version_name: 'Fingerstyle Intro',
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Intermediate',
@@ -137,5 +139,32 @@ E|-------|-------------|-------|---------|
     created_at: now,
     updated_at: now,
   },
-];
+  {
+    id: 5,
+    title: 'Blackbird',
+    artist: 'The Beatles',
+    version_name: 'Chords & Lyrics',
+    tuning: 'Standard (E A D G B E)',
+    capo: 0,
+    difficulty: 'Beginner',
+    content: `[Verse 1]
+[G]Blackbird [Am7]singing in the [G/B]dead of night
+[C]Take these [C#dim]broken wings and [D]learn to [D#dim]fly
+[Em]All your [Eb]life
+[D]You were [C#dim]only waiting for this [C]moment [Cm]to a[G]rise
 
+[Verse 2]
+[G]Blackbird [Am7]singing in the [G/B]dead of night
+[C]Take these [C#dim]sunken eyes and [D]learn to [D#dim]see
+[Em]All your [Eb]life
+[D]You were [C#dim]only waiting for this [C]moment to be [G]free
+
+[Chorus]
+[F]Black[Em]bird, [Dm]fly... [C]
+[Bb]Into the [C]light of the [D]dark black night
+`,
+    is_favorite: false,
+    created_at: now,
+    updated_at: now,
+  },
+];

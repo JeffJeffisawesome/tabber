@@ -15,11 +15,16 @@ function getLocalTabs(): GuitarTab[] {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(STARTER_TABS));
       return STARTER_TABS;
     }
-    return JSON.parse(raw);
+    const parsed: GuitarTab[] = JSON.parse(raw);
+    return parsed.map((t) => ({
+      ...t,
+      version_name: t.version_name || 'Chords',
+    }));
   } catch {
     return STARTER_TABS;
   }
 }
+
 
 function saveLocalTabs(tabs: GuitarTab[]): void {
   try {
@@ -176,9 +181,10 @@ export const api = {
     const now = new Date().toISOString();
 
     if (isSupabaseConfigured() && supabase) {
-      const record = {
+      const record: Record<string, unknown> = {
         title: payload.title.trim(),
         artist: payload.artist.trim(),
+        version_name: payload.version_name?.trim() || 'Chords',
         tuning: payload.tuning,
         capo: payload.capo,
         difficulty: payload.difficulty,
@@ -188,9 +194,18 @@ export const api = {
         updated_at: now,
       };
 
-      const { data, error } = await supabase.from('tabs').insert(record).select().single();
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase.from('tabs').insert(record).select().single();
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        // Fallback retry without version_name if Supabase table has not run the column migration
+        const compatRecord = { ...record };
+        delete compatRecord.version_name;
+        const { data, error } = await supabase.from('tabs').insert(compatRecord).select().single();
+        if (error) throw error;
+        return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+      }
     }
 
     // Local Storage
@@ -200,6 +215,7 @@ export const api = {
       id: maxId + 1,
       title: payload.title.trim(),
       artist: payload.artist.trim(),
+      version_name: payload.version_name?.trim() || 'Chords',
       tuning: payload.tuning,
       capo: payload.capo,
       difficulty: payload.difficulty,
@@ -222,6 +238,7 @@ export const api = {
       const updateData: Record<string, unknown> = { updated_at: now };
       if (payload.title !== undefined) updateData.title = payload.title.trim();
       if (payload.artist !== undefined) updateData.artist = payload.artist.trim();
+      if (payload.version_name !== undefined) updateData.version_name = payload.version_name.trim();
       if (payload.tuning !== undefined) updateData.tuning = payload.tuning;
       if (payload.capo !== undefined) updateData.capo = payload.capo;
       if (payload.difficulty !== undefined) updateData.difficulty = payload.difficulty;
@@ -232,6 +249,7 @@ export const api = {
       if (error) throw error;
       return data;
     }
+
 
     // Local Storage
     const tabs = getLocalTabs();

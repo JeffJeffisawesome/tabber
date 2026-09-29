@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from './services/api';
-import type { GuitarTab, TabCreate, HealthResponse } from './types/api';
+import type { GuitarTab, TabCreate, HealthResponse, SongGroup } from './types/api';
 import TabViewer from './components/TabViewer';
 import TabEditorModal from './components/TabEditorModal';
 import { TabImportModal } from './components/TabImportModal';
@@ -9,6 +9,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import useIsMobile from './hooks/useIsMobile';
 import './App.css';
 
+const getSongKey = (title: string, artist: string): string => {
+  return `${title.trim().toLowerCase()}:::${artist.trim().toLowerCase()}`;
+};
 
 const FILTER_DIFFICULTIES = ['All', 'Favorites', 'Beginner', 'Intermediate', 'Advanced'] as const;
 
@@ -183,6 +186,65 @@ const TabberApp: React.FC = () => {
   const activeTab = useMemo(() => {
     return tabs.find((t) => t.id === selectedTabId) || null;
   }, [tabs, selectedTabId]);
+
+  // Coalesce tabs for the same song into SongGroup entries
+  const songGroups = useMemo<SongGroup[]>(() => {
+    const groupMap = new Map<string, SongGroup>();
+    for (const tab of tabs) {
+      const key = getSongKey(tab.title, tab.artist);
+      const existing = groupMap.get(key);
+      if (existing) {
+        existing.tabs.push(tab);
+      } else {
+        groupMap.set(key, {
+          songKey: key,
+          title: tab.title,
+          artist: tab.artist,
+          tabs: [tab],
+        });
+      }
+    }
+    return Array.from(groupMap.values());
+  }, [tabs]);
+
+  // All tabs/arrangements for the active song
+  const activeSongTabs = useMemo(() => {
+    if (!activeTab) return [];
+    const activeKey = getSongKey(activeTab.title, activeTab.artist);
+    const group = songGroups.find((g) => g.songKey === activeKey);
+    return group ? group.tabs : [activeTab];
+  }, [activeTab, songGroups]);
+
+  // Track expanded song cards in sidebar
+  const [expandedSongKeys, setExpandedSongKeys] = useState<Set<string>>(new Set());
+
+  // Auto-expand group of selected tab whenever selectedTabId changes
+  useEffect(() => {
+    if (selectedTabId && activeTab) {
+      const key = getSongKey(activeTab.title, activeTab.artist);
+      setExpandedSongKeys((prev) => {
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    }
+  }, [selectedTabId, activeTab]);
+
+  const toggleExpandSong = (songKey: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setExpandedSongKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(songKey)) {
+        next.delete(songKey);
+      } else {
+        next.add(songKey);
+      }
+      return next;
+    });
+  };
 
   // Handlers with strict authentication checks
   const handleSaveTab = async (payload: TabCreate) => {
@@ -411,7 +473,8 @@ const TabberApp: React.FC = () => {
           >
             <div className="sidebar-header">
               <span className="tab-count-badge">
-                {tabs.length} {tabs.length === 1 ? 'Tab' : 'Tabs'} Found
+                {songGroups.length} {songGroups.length === 1 ? 'Song' : 'Songs'}
+                {tabs.length !== songGroups.length && ` • ${tabs.length} Tabs`}
               </span>
             </div>
 
@@ -426,36 +489,147 @@ const TabberApp: React.FC = () => {
               </div>
             ) : (
               <ul className="tabs-list">
-                {tabs.map((tab) => {
-                  const isSelected = tab.id === selectedTabId;
+                {songGroups.map((group) => {
+                  const isMultiTab = group.tabs.length > 1;
+                  const isExpanded = expandedSongKeys.has(group.songKey) || searchQuery.trim().length > 0;
+                  const hasSelectedTab = group.tabs.some((t) => t.id === selectedTabId);
+                  const isAnyFavorite = group.tabs.some((t) => t.is_favorite);
+
+                  if (!isMultiTab) {
+                    const tab = group.tabs[0];
+                    const isSelected = tab.id === selectedTabId;
+                    return (
+                      <li
+                        key={group.songKey}
+                        className={`tab-list-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSelectTab(tab.id)}
+                      >
+                        <div className="tab-list-main">
+                          <div className="tab-list-top">
+                            <strong className="tab-list-title">{tab.title}</strong>
+                            <button
+                              className={`btn-star-mini ${tab.is_favorite ? 'favorited' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(tab.id);
+                              }}
+                              title={tab.is_favorite ? 'Favorited' : 'Add to favorites'}
+                            >
+                              ★
+                            </button>
+                          </div>
+                          <span className="tab-list-artist">{tab.artist}</span>
+                          <div className="tab-list-meta">
+                            {tab.version_name && (
+                              <span className="pill-version">{tab.version_name}</span>
+                            )}
+                            <span className={`pill-diff pill-${tab.difficulty.toLowerCase()}`}>
+                              {tab.difficulty}
+                            </span>
+                            {tab.capo > 0 && <span className="pill-capo">Capo {tab.capo}</span>}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  }
+
+                  // Multi-tab coalesced entry
                   return (
                     <li
-                      key={tab.id}
-                      className={`tab-list-item ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleSelectTab(tab.id)}
+                      key={group.songKey}
+                      className={`song-group-item ${hasSelectedTab ? 'has-selected' : ''} ${isExpanded ? 'expanded' : ''}`}
                     >
-                      <div className="tab-list-main">
-                        <div className="tab-list-top">
-                          <strong className="tab-list-title">{tab.title}</strong>
-                          <button
-                            className={`btn-star-mini ${tab.is_favorite ? 'favorited' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleFavorite(tab.id);
-                            }}
-                            title={tab.is_favorite ? 'Favorited' : 'Add to favorites'}
-                          >
-                            ★
-                          </button>
-                        </div>
-                        <span className="tab-list-artist">{tab.artist}</span>
-                        <div className="tab-list-meta">
-                          <span className={`pill-diff pill-${tab.difficulty.toLowerCase()}`}>
-                            {tab.difficulty}
-                          </span>
-                          {tab.capo > 0 && <span className="pill-capo">Capo {tab.capo}</span>}
+                      <div
+                        className="song-group-header"
+                        onClick={() => {
+                          if (!hasSelectedTab) {
+                            handleSelectTab(group.tabs[0].id);
+                          }
+                          toggleExpandSong(group.songKey);
+                        }}
+                      >
+                        <div className="song-group-main">
+                          <div className="song-group-top">
+                            <div className="song-group-title-wrap">
+                              <span
+                                className={`song-group-caret ${isExpanded ? 'expanded' : ''}`}
+                                onClick={(e) => toggleExpandSong(group.songKey, e)}
+                                title={isExpanded ? 'Collapse versions' : 'Expand versions'}
+                              >
+                                {isExpanded ? '▾' : '▸'}
+                              </span>
+                              <strong className="song-group-title">{group.title}</strong>
+                            </div>
+                            <button
+                              className={`btn-star-mini ${isAnyFavorite ? 'favorited' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const activeInGroup = group.tabs.find((t) => t.id === selectedTabId) || group.tabs[0];
+                                handleToggleFavorite(activeInGroup.id);
+                              }}
+                              title={isAnyFavorite ? 'Favorited' : 'Add to favorites'}
+                            >
+                              ★
+                            </button>
+                          </div>
+                          <span className="song-group-artist">{group.artist}</span>
+                          <div className="song-group-meta">
+                            <span className="song-version-count-badge">
+                              🎵 {group.tabs.length} Tabs
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Nested Version Sublist */}
+                      {isExpanded && (
+                        <ul className="song-group-versions">
+                          {group.tabs.map((tab, idx) => {
+                            const isTabSelected = tab.id === selectedTabId;
+                            return (
+                              <li
+                                key={tab.id}
+                                className={`song-version-subitem ${isTabSelected ? 'selected' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectTab(tab.id);
+                                }}
+                              >
+                                <div className="song-version-content">
+                                  <div className="song-version-top">
+                                    <span className="song-version-name">
+                                      <span className="version-icon">
+                                        {tab.version_name?.toLowerCase().includes('tab') ? '🎼' : '🎸'}
+                                      </span>
+                                      {tab.version_name || `Arrangement ${idx + 1}`}
+                                    </span>
+                                    <button
+                                      className={`btn-star-micro ${tab.is_favorite ? 'favorited' : ''}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleFavorite(tab.id);
+                                      }}
+                                      title={tab.is_favorite ? 'Favorited' : 'Add to favorites'}
+                                    >
+                                      ★
+                                    </button>
+                                  </div>
+                                  <div className="song-version-meta">
+                                    <span className={`pill-diff-micro pill-${tab.difficulty.toLowerCase()}`}>
+                                      {tab.difficulty}
+                                    </span>
+                                    {tab.capo > 0 ? (
+                                      <span className="pill-capo-micro">Capo {tab.capo}</span>
+                                    ) : (
+                                      <span className="pill-capo-micro">No Capo</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
@@ -487,6 +661,8 @@ const TabberApp: React.FC = () => {
             {activeTab ? (
               <TabViewer
                 tab={activeTab}
+                songTabs={activeSongTabs}
+                onSelectTabVersion={handleSelectTab}
                 onToggleFavorite={handleToggleFavorite}
                 onEdit={openEditTabModal}
                 onDelete={handleDeleteTab}

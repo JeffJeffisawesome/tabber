@@ -119,6 +119,11 @@ def parse_ug_page(html_doc: str, source_url: str = "") -> TabCreate:
     diff_raw = tab_info.get("difficulty") or meta.get("difficulty")
     difficulty = normalize_difficulty(diff_raw)
 
+    # Version name (e.g. 'Chords (Ver 1)', 'Tabs (Ver 2)')
+    raw_type = tab_info.get("type_name") or tab_info.get("type") or "Chords"
+    version_num = tab_info.get("version") or 1
+    version_name = f"{raw_type} (Ver {version_num})"
+
     # Tab body
     content_raw = tab_view.get("wiki_tab", {}).get("content", "")
     content = clean_tab_content(content_raw)
@@ -129,12 +134,14 @@ def parse_ug_page(html_doc: str, source_url: str = "") -> TabCreate:
     return TabCreate(
         title=title[:150],
         artist=artist[:150],
+        version_name=version_name[:50],
         tuning=tuning,
         capo=capo,
         difficulty=difficulty,
         content=content,
         is_favorite=False,
     )
+
 
 
 def scrape_ug_url(url: str) -> TabCreate:

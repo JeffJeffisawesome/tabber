@@ -53,7 +53,11 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
 
   const [title, setTitle] = useState(initialTab?.title || initialTabCreate?.title || '');
   const [artist, setArtist] = useState(initialTab?.artist || initialTabCreate?.artist || '');
+  const [versionName, setVersionName] = useState(
+    initialTab?.version_name || initialTabCreate?.version_name || 'Chords (Standard)'
+  );
   const [tuning, setTuning] = useState(
+
     initialTab?.tuning || initialTabCreate?.tuning || COMMON_TUNINGS[0]
   );
   const [customTuning, setCustomTuning] = useState('');
@@ -119,6 +123,9 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
         setTuning('Custom');
         setCustomTuning(tab.tuning);
       }
+      if (tab.version_name) {
+        setVersionName(tab.version_name);
+      }
       setContent(tab.content);
       setImportStatus({
         type: 'success',
@@ -150,6 +157,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
       await onSave({
         title: title.trim(),
         artist: artist.trim(),
+        version_name: versionName.trim() || 'Chords',
         tuning: finalTuning,
         capo: Number(capo) || 0,
         difficulty,
@@ -157,6 +165,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
         is_favorite: isFavorite,
       });
       onClose();
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save tab');
     } finally {
@@ -238,7 +247,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
             </div>
           )}
 
-          <div className="form-grid-2">
+          <div className="form-grid-3">
             <div className="form-group">
               <label htmlFor="tab-title">Song Title *</label>
               <input
@@ -264,7 +273,20 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
                 required
               />
             </div>
+
+            <div className="form-group">
+              <label htmlFor="tab-version">Arrangement / Version</label>
+              <input
+                id="tab-version"
+                type="text"
+                className="form-input"
+                placeholder="e.g. Chords, Tabs / Solo, Acoustic"
+                value={versionName}
+                onChange={(e) => setVersionName(e.target.value)}
+              />
+            </div>
           </div>
+
 
           <div className="form-grid-3">
             <div className="form-group">
