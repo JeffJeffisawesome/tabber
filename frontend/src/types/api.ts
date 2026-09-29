@@ -15,6 +15,7 @@ export interface GuitarTab {
   id: number;
   title: string;
   artist: string;
+  version_name?: string;
   tuning: string;
   capo: number;
   difficulty: TabDifficulty;
@@ -27,6 +28,7 @@ export interface GuitarTab {
 export interface TabCreate {
   title: string;
   artist: string;
+  version_name?: string;
   tuning: string;
   capo: number;
   difficulty: TabDifficulty;
@@ -37,6 +39,7 @@ export interface TabCreate {
 export interface TabUpdate {
   title?: string;
   artist?: string;
+  version_name?: string;
   tuning?: string;
   capo?: number;
   difficulty?: TabDifficulty;
@@ -44,9 +47,38 @@ export interface TabUpdate {
   is_favorite?: boolean;
 }
 
+
 export interface TabFilter {
   q?: string;
   difficulty?: string;
   favorite?: boolean;
   tuning?: string;
 }
+
+export interface UGSearchResult {
+  title: string;
+  artist: string;
+  type: string;
+  rating: number;
+  votes: number;
+  url: string;
+  version: number;
+  is_top_pick: boolean;
+}
+
+export interface TabImportResponse {
+  tab: TabCreate;
+  saved_tab?: GuitarTab | null;
+}
+
+export interface SongGroup {
+  songKey: string;
+  key?: string;
+  title: string;
+  artist: string;
+  tabs: GuitarTab[];
+  hasFavorite?: boolean;
+  latestUpdatedAt?: string;
+}
+
+

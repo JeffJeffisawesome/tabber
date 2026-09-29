@@ -6,6 +6,8 @@ import LyricChordView from './LyricChordView';
 
 interface TabViewerProps {
   tab: GuitarTab;
+  songTabs?: GuitarTab[];
+  onSelectTabVersion?: (tabId: number) => void;
   onToggleFavorite: (id: number) => void;
   onEdit: (tab: GuitarTab) => void;
   onDelete: (id: number) => void;
@@ -18,6 +20,8 @@ interface TabViewerProps {
 
 export const TabViewer: React.FC<TabViewerProps> = ({
   tab,
+  songTabs,
+  onSelectTabVersion,
   onToggleFavorite,
   onEdit,
   onDelete,
@@ -28,6 +32,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   onToggleMaximizeLyrics,
 }) => {
   const [fontSize, setFontSize] = useState<number>(15);
+
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
   const [scrollSpeed, setScrollSpeed] = useState<number>(2);
   const [copied, setCopied] = useState<boolean>(false);
@@ -311,9 +316,25 @@ export const TabViewer: React.FC<TabViewerProps> = ({
             )}
             <div className="compact-title-wrap">
               <span className="compact-song-title">{tab.title}</span>
-              <span className="compact-song-artist">by {tab.artist}</span>
+              {songTabs && songTabs.length > 1 ? (
+                <select
+                  className="compact-version-select"
+                  value={tab.id}
+                  onChange={(e) => onSelectTabVersion?.(Number(e.target.value))}
+                  title="Switch tab arrangement"
+                >
+                  {songTabs.map((sTab) => (
+                    <option key={sTab.id} value={sTab.id}>
+                      {sTab.version_name || 'Version'}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="compact-song-artist">by {tab.artist}</span>
+              )}
             </div>
             <button
+
               className={`btn-fav-star-mini ${tab.is_favorite ? 'favorited' : ''}`}
               onClick={() => onToggleFavorite(tab.id)}
               title={tab.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
@@ -396,6 +417,12 @@ export const TabViewer: React.FC<TabViewerProps> = ({
               <p className="tab-viewer-artist">by {tab.artist}</p>
 
               <div className="tab-badges">
+                {tab.version_name && (
+                  <span className="badge badge-version">
+                    {tab.version_name.toLowerCase().includes('tab') ? '🎼 ' : '🎸 '}
+                    {tab.version_name}
+                  </span>
+                )}
                 <span className="badge badge-tuning">🎵 {tab.tuning}</span>
                 {tab.capo > 0 ? (
                   <span className="badge badge-capo">Capo: Fret {tab.capo}</span>
@@ -406,7 +433,35 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                   {tab.difficulty}
                 </span>
               </div>
+
+              {/* Version Switcher Ribbon (when song has multiple arrangements) */}
+              {songTabs && songTabs.length > 1 && (
+                <div className="tab-viewer-version-ribbon">
+                  <span className="version-ribbon-label">Arrangements:</span>
+                  <div className="version-ribbon-pills">
+                    {songTabs.map((sTab) => {
+                      const isActive = sTab.id === tab.id;
+                      return (
+                        <button
+                          key={sTab.id}
+                          type="button"
+                          className={`version-ribbon-pill ${isActive ? 'active' : ''}`}
+                          onClick={() => onSelectTabVersion?.(sTab.id)}
+                          title={`Switch to ${sTab.version_name || 'Arrangement'}`}
+                        >
+                          <span className="version-pill-icon">
+                            {sTab.version_name?.toLowerCase().includes('tab') ? '🎼' : '🎸'}
+                          </span>
+                          <span className="version-pill-name">{sTab.version_name || 'Standard'}</span>
+                          {sTab.is_favorite && <span className="version-pill-star">★</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+
 
             <div className="tab-viewer-actions">
               {isMobile && (
