@@ -296,9 +296,11 @@ export const api = {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    // 1. Try backend search endpoint
+    const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+
+    // 1. Try serverless / backend search endpoint
     try {
-      const res = await fetch(`/api/tabs/search-ug?q=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(`${apiBase}/api/tabs/search-ug?q=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         const data: UGSearchResult[] = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -306,7 +308,7 @@ export const api = {
         }
       }
     } catch {
-      // Backend unavailable, fallback to direct proxy fetch
+      // Backend/serverless unavailable, fallback to direct proxy fetch
     }
 
     // 2. Client-side fallback via CORS proxy
@@ -363,9 +365,11 @@ export const api = {
     const trimmed = url.trim();
     if (!trimmed) throw new Error('URL is required');
 
-    // 1. Try backend import endpoint
+    const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+
+    // 1. Try serverless / backend import endpoint
     try {
-      const res = await fetch('/api/tabs/import-url', {
+      const res = await fetch(`${apiBase}/api/tabs/import-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed, save: autoSave }),
@@ -412,8 +416,8 @@ export const api = {
     const tabView = pageData.tab_view || {};
     const meta = tabView.meta || {};
 
-    const rawContent: string = tabView?.wiki_tab?.content || '';
-    const cleanContent = rawContent
+    const contentRaw = tabView?.wiki_tab?.content || '';
+    const cleanContent = contentRaw
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, '&')
       .replace(/&#039;/g, "'")
@@ -443,9 +447,14 @@ export const api = {
 
     const capo = Math.max(0, Math.min(12, Number(meta.capo || tabInfo.capo || 0)));
 
+    const rawType = tabInfo.type_name || tabInfo.type || 'Chords';
+    const versionNum = tabInfo.version || 1;
+    const versionName = `${rawType} (Ver ${versionNum})`;
+
     const tabCreate: TabCreate = {
       title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
       artist: tabInfo.artist_name || pageData.artist_name || 'Unknown Artist',
+      version_name: versionName,
       tuning,
       capo,
       difficulty,
