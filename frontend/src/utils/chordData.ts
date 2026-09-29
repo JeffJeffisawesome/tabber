@@ -69,6 +69,9 @@ export function isChordSymbol(token: string): boolean {
   if (/^(intro|verse|chorus|bridge|outro|solo|hook|refrain|interlude)/i.test(clean)) {
     return false;
   }
+  if (/^(n\.?c\.?|n\/c)$/i.test(clean)) {
+    return true;
+  }
   return CHORD_TOKEN_REGEX.test(clean);
 }
 
@@ -1579,7 +1582,7 @@ export function extractChordsFromSong(content: string): string[] {
   let match;
   while ((match = bracketRegex.exec(content)) !== null) {
     const candidate = match[1].trim();
-    if (isChordSymbol(candidate)) {
+    if (isChordSymbol(candidate) && !/^(n\.?c\.?|n\/c)$/i.test(candidate)) {
       chordsFound.add(candidate);
     }
   }
@@ -1600,7 +1603,9 @@ export function extractChordsFromSong(content: string): string[] {
     const tokens = trimmed.split(/\s+/).filter(Boolean);
     if (tokens.length > 0 && tokens.every((t) => isChordSymbol(t))) {
       for (const t of tokens) {
-        chordsFound.add(t);
+        if (!/^(n\.?c\.?|n\/c)$/i.test(t)) {
+          chordsFound.add(t);
+        }
       }
     }
   }

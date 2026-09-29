@@ -34,6 +34,48 @@ function saveLocalTabs(tabs: GuitarTab[]): void {
   }
 }
 
+/**
+ * Decodes HTML entities commonly returned in Ultimate Guitar tabs (e.g. &rsquo;, &lsquo;, &amp;, &quot;).
+ */
+export function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&hellip;/g, '...')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, dec) => {
+      const code = parseInt(dec, 10);
+      return code ? String.fromCharCode(code) : '';
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+      const code = parseInt(hex, 16);
+      return code ? String.fromCharCode(code) : '';
+    });
+}
+
+/**
+ * Cleans scraped tab content: decodes HTML entities, removes internal [ch] / [tab] tags,
+ * trims trailing spaces on lines to eliminate phantom blank space gaps, and normalizes line breaks.
+ */
+export function cleanTabContent(raw: string): string {
+  if (!raw) return '';
+  let text = decodeHtmlEntities(raw);
+  text = text.replace(/\[\/?(ch|tab)\]/g, '');
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n').map((l) => l.trimEnd());
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export const api = {
   /**
    * Check connection status to Supabase or report local mode.
@@ -245,9 +287,18 @@ export const api = {
       if (payload.content !== undefined) updateData.content = payload.content;
       if (payload.is_favorite !== undefined) updateData.is_favorite = payload.is_favorite;
 
-      const { data, error } = await supabase.from('tabs').update(updateData).eq('id', id).select().single();
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase.from('tabs').update(updateData).eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        // Fallback retry without version_name if Supabase table has not run the column migration
+        const compatData = { ...updateData };
+        delete compatData.version_name;
+        const { data, error } = await supabase.from('tabs').update(compatData).eq('id', id).select().single();
+        if (error) throw error;
+        return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+      }
     }
 
 
@@ -417,16 +468,7 @@ export const api = {
     const meta = tabView.meta || {};
 
     const contentRaw = tabView?.wiki_tab?.content || '';
-    const cleanContent = contentRaw
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&#039;/g, "'")
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/\[\/?(ch|tab)\]/g, '')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .trim();
+    const cleanContent = cleanTabContent(contentRaw);
 
     if (!cleanContent) {
       throw new Error('Tab content is empty or protected');
@@ -448,8 +490,8 @@ export const api = {
     const capo = Math.max(0, Math.min(12, Number(meta.capo || tabInfo.capo || 0)));
 
     const rawType = tabInfo.type_name || tabInfo.type || 'Chords';
-    const versionNum = tabInfo.version || 1;
-    const versionName = `${rawType} (Ver ${versionNum})`;
+    const versionNum = Number(tabInfo.version || 1);
+    const versionName = versionNum > 1 ? `${rawType} (Ver ${versionNum})` : rawType;
 
     const tabCreate: TabCreate = {
       title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
