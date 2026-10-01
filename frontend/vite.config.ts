@@ -4,6 +4,41 @@ import react from '@vitejs/plugin-react';
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&hellip;/g, '...')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, dec) => {
+      const code = parseInt(dec, 10);
+      return code ? String.fromCharCode(code) : '';
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+      const code = parseInt(hex, 16);
+      return code ? String.fromCharCode(code) : '';
+    });
+}
+
+function cleanTabContent(raw: string): string {
+  if (!raw) return '';
+  let text = decodeHtmlEntities(raw);
+  text = text.replace(/\[\/?(ch|tab)\]/g, '');
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n').map((l) => l.trimEnd());
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /**
  * Vite plugin that intercepts /api/tabs/search-ug and /api/tabs/import-url
  * to execute Ultimate Guitar web searches and tab scraping directly in Node.js
@@ -109,16 +144,7 @@ function ultimateGuitarPlugin(): Plugin {
         const meta = tabView.meta || {};
 
         const contentRaw = tabView?.wiki_tab?.content || '';
-        const content = contentRaw
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&#039;/g, "'")
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/\[\/?(ch|tab)\]/g, '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .trim();
+        const content = cleanTabContent(contentRaw);
 
         let difficulty = 'Intermediate';
         const diffRaw = String(tabInfo.difficulty || meta.difficulty || '').toLowerCase();
@@ -147,8 +173,8 @@ function ultimateGuitarPlugin(): Plugin {
         const capo = Math.max(0, Math.min(12, Number(meta.capo || tabInfo.capo || 0)));
 
         const rawType = tabInfo.type_name || tabInfo.type || 'Chords';
-        const versionNum = tabInfo.version || 1;
-        const versionName = `${rawType} (Ver ${versionNum})`;
+        const versionNum = Number(tabInfo.version || 1);
+        const versionName = versionNum > 1 ? `${rawType} (Ver ${versionNum})` : rawType;
 
         const tabCreate = {
           title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',

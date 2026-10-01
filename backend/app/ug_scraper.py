@@ -25,7 +25,7 @@ HEADERS = {
 
 
 def clean_tab_content(raw_content: str) -> str:
-    """Normalize raw tab content by removing UG tags and standardizing line breaks."""
+    """Normalize raw tab content by removing UG tags, decoding entities, and standardizing line breaks."""
     if not raw_content:
         return ""
 
@@ -38,7 +38,13 @@ def clean_tab_content(raw_content: str) -> str:
     # Normalize line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Trim leading/trailing blank lines
+    # Trim trailing whitespace on each line so blank spaces collapse cleanly
+    lines = [line.rstrip() for line in text.split("\n")]
+    text = "\n".join(lines)
+
+    # Collapse 3 or more consecutive blank lines down to 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
 
 
@@ -119,10 +125,13 @@ def parse_ug_page(html_doc: str, source_url: str = "") -> TabCreate:
     diff_raw = tab_info.get("difficulty") or meta.get("difficulty")
     difficulty = normalize_difficulty(diff_raw)
 
-    # Version name (e.g. 'Chords (Ver 1)', 'Tabs (Ver 2)')
+    # Version name (e.g. 'Chords' for Ver 1, 'Chords (Ver 2)', 'Tabs (Ver 2)')
     raw_type = tab_info.get("type_name") or tab_info.get("type") or "Chords"
-    version_num = tab_info.get("version") or 1
-    version_name = f"{raw_type} (Ver {version_num})"
+    try:
+        version_num = int(tab_info.get("version") or 1)
+    except (ValueError, TypeError):
+        version_num = 1
+    version_name = f"{raw_type} (Ver {version_num})" if version_num > 1 else raw_type
 
     # Tab body
     content_raw = tab_view.get("wiki_tab", {}).get("content", "")

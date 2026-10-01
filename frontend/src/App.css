@@ -1085,12 +1085,33 @@
 
 .plain-chord-line {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
-  white-space: pre-wrap;
+  white-space: pre;
   line-height: 1.35;
   margin-bottom: 0.2rem;
   color: var(--primary);
   font-weight: 700;
   overflow-x: auto;
+}
+
+.plain-chord-line .chord-pill {
+  font-family: inherit;
+  font-size: 1em;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  border-bottom: 1px dashed var(--primary);
+  border-radius: 0;
+  line-height: inherit;
+  display: inline;
+}
+
+.plain-chord-line .chord-pill:hover,
+.plain-chord-line .chord-pill.active-chord {
+  background-color: #fef3c7;
+  color: #b45309;
+  border-radius: 2px;
 }
 
 .plain-lyric-line {
@@ -1102,6 +1123,8 @@
 
 .plain-lyric-line.monospace-aligned {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
+  white-space: pre;
+  overflow-x: auto;
 }
 
 .plain-lyric-line.empty-line {
