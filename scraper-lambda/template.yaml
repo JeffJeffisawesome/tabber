@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Tabber Scraper Lambda Service (Node.js 20, High Memory, Function URL with CORS)
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 1024
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+
+Resources:
+  TabberScraperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tabber-scraper-service
+      Description: High-performance Ultimate Guitar scraper for Tabber
+      CodeUri: dist/
+      Handler: index.handler
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - GET
+            - POST
+            - OPTIONS
+          AllowHeaders:
+            - Content-Type
+            - Authorization
+          MaxAge: 86400
+
+Outputs:
+  ScraperFunctionUrl:
+    Description: "Public Lambda Function URL"
+    Value: !GetAtt TabberScraperFunctionUrl.FunctionUrl
+
