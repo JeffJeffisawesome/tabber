@@ -21,6 +21,13 @@ API_V1_STR: str = "/api"
 # Supabase Credentials
 SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
 SUPABASE_KEY: Optional[str] = os.getenv("SUPABASE_KEY")
+# Supabase Credentials (supports standard names and VITE_ prefixed names)
+SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+SUPABASE_KEY: Optional[str] = (
+    os.getenv("SUPABASE_KEY")
+    or os.getenv("VITE_SUPABASE_ANON_KEY")
+    or os.getenv("VITE_SUPABASE_PUBLISHABLE_KEY")
+)
 
 
 def is_supabase_configured() -> bool:
