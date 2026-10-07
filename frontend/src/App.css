@@ -1010,7 +1010,7 @@
 
 /* Standardized Lyrics & Chords View */
 .lyric-chord-display {
-  font-family: var(--font-family);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
   color: #201812;
   line-height: 1.6;
 }
@@ -1115,10 +1115,12 @@
 }
 
 .plain-lyric-line {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Monaco, 'Courier New', monospace;
   min-height: 1.4em;
   margin-bottom: 0.35rem;
   color: #3b3026;
-  white-space: pre-wrap;
+  white-space: pre;
+  overflow-x: auto;
 }
 
 .plain-lyric-line.monospace-aligned {

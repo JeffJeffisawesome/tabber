@@ -187,8 +187,8 @@ export const LyricChordView: React.FC<LyricChordViewProps> = ({
       continue;
     }
 
-    const prevBlock = blocks[blocks.length - 1];
-    const isMonospace = Boolean(prevBlock && prevBlock.type === 'chord-line');
+    // Always use monospace so chords, lyrics, and blank space line up on an identical grid
+    const isMonospace = true;
 
     blocks.push({ type: 'plain', text: line, isMonospace });
     i++;
