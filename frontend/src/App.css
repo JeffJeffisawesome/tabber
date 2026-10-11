@@ -778,6 +778,16 @@
   font-weight: 600;
 }
 
+.badge-author {
+  background: #fdf2f8;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 /* Arrangements Ribbon in TabViewer Header */
 .tab-viewer-version-ribbon {
   display: flex;

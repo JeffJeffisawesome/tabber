@@ -1,7 +1,6 @@
 import type { GuitarTab, TabCreate, TabUpdate, TabFilter, HealthResponse, UGSearchResult, TabImportResponse, TabDifficulty } from '../types/api';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { STARTER_TABS } from './starterData';
-
+import { STARTER_TABS, DEFAULT_AUTHOR } from './starterData';
 
 const LOCAL_STORAGE_KEY = 'tabber_guitar_tabs';
 
@@ -18,6 +17,8 @@ function getLocalTabs(): GuitarTab[] {
     const parsed: GuitarTab[] = JSON.parse(raw);
     return parsed.map((t) => ({
       ...t,
+      user_id: t.user_id || DEFAULT_AUTHOR.id,
+      author: t.author || DEFAULT_AUTHOR,
       version_name: t.version_name || 'Chords',
     }));
   } catch {
@@ -140,7 +141,12 @@ export const api = {
   async getTabs(filter?: TabFilter): Promise<GuitarTab[]> {
     if (isSupabaseConfigured() && supabase) {
       try {
-        let query = supabase.from('tabs').select('*');
+        let query;
+        try {
+          query = supabase.from('tabs').select('*, author:users(id, name, avatar_url)');
+        } catch {
+          query = supabase.from('tabs').select('*');
+        }
 
         if (filter?.difficulty && filter.difficulty !== 'All') {
           query = query.eq('difficulty', filter.difficulty);
@@ -154,7 +160,19 @@ export const api = {
 
         query = query.order('is_favorite', { ascending: false }).order('updated_at', { ascending: false });
 
-        const { data, error } = await query;
+        let { data, error } = await query;
+        // Fallback retry with select('*') if users join is not yet created in Supabase
+        if (error && (error.code === 'PGRST200' || error.message?.includes('users'))) {
+          let retryQuery = supabase.from('tabs').select('*');
+          if (filter?.difficulty && filter.difficulty !== 'All') retryQuery = retryQuery.eq('difficulty', filter.difficulty);
+          if (filter?.favorite !== undefined) retryQuery = retryQuery.eq('is_favorite', filter.favorite);
+          if (filter?.tuning && filter.tuning !== 'All') retryQuery = retryQuery.eq('tuning', filter.tuning);
+          retryQuery = retryQuery.order('is_favorite', { ascending: false }).order('updated_at', { ascending: false });
+          const retryRes = await retryQuery;
+          data = retryRes.data;
+          error = retryRes.error;
+        }
+
         if (error) throw error;
 
         let results: GuitarTab[] = data || [];
@@ -205,6 +223,17 @@ export const api = {
    */
   async getTab(id: number): Promise<GuitarTab> {
     if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('tabs')
+          .select('*, author:users(id, name, avatar_url)')
+          .eq('id', id)
+          .single();
+        if (!error && data) return data;
+      } catch {
+        // Fallback to select('*')
+      }
+
       const { data, error } = await supabase.from('tabs').select('*').eq('id', id).single();
       if (error) throw error;
       return data;
@@ -217,12 +246,44 @@ export const api = {
   },
 
   /**
-   * Save a new guitar tab.
+   * Save a new guitar tab with author association.
    */
   async createTab(payload: TabCreate): Promise<GuitarTab> {
     const now = new Date().toISOString();
 
     if (isSupabaseConfigured() && supabase) {
+      // Determine author user_id from session or payload
+      let authorId = payload.user_id;
+      let authorName = 'Guitarist';
+      let authorEmail = '';
+      let authorAvatar = '';
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          authorId = user.id;
+          const meta = user.user_metadata || {};
+          authorName = meta.full_name || meta.name || user.email?.split('@')[0] || 'Guitarist';
+          authorEmail = user.email || '';
+          authorAvatar = meta.avatar_url || meta.picture || '';
+
+          // Upsert into public.users to satisfy foreign key
+          try {
+            await supabase.from('users').upsert({
+              id: user.id,
+              email: authorEmail,
+              name: authorName,
+              avatar_url: authorAvatar,
+              updated_at: now,
+            });
+          } catch {
+            // Ignore
+          }
+        }
+      } catch {
+        // Continue with provided payload.user_id
+      }
+
       const record: Record<string, unknown> = {
         title: payload.title.trim(),
         artist: payload.artist.trim(),
@@ -236,25 +297,60 @@ export const api = {
         updated_at: now,
       };
 
+      if (authorId) {
+        record.user_id = authorId;
+      }
+
       try {
-        const { data, error } = await supabase.from('tabs').insert(record).select().single();
+        const { data, error } = await supabase
+          .from('tabs')
+          .insert(record)
+          .select('*, author:users(id, name, avatar_url)')
+          .single();
         if (error) throw error;
         return data;
-      } catch (err) {
-        // Fallback retry without version_name if Supabase table has not run the column migration
+      } catch (err: any) {
+        // Fallback retry without author relation or version_name if migration is partial
         const compatRecord = { ...record };
         delete compatRecord.version_name;
-        const { data, error } = await supabase.from('tabs').insert(compatRecord).select().single();
-        if (error) throw error;
-        return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+        try {
+          const { data, error } = await supabase.from('tabs').insert(compatRecord).select().single();
+          if (error) throw error;
+          return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+        } catch (err2: any) {
+          // If foreign key constraint failed because users table is not yet created, retry without user_id
+          const noUserRecord = { ...compatRecord };
+          delete noUserRecord.user_id;
+          const { data, error } = await supabase.from('tabs').insert(noUserRecord).select().single();
+          if (error) throw error;
+          return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+        }
       }
     }
 
     // Local Storage
+    let localAuthor = DEFAULT_AUTHOR;
+    try {
+      const storedUser = localStorage.getItem('tabber_local_auth_user');
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        localAuthor = {
+          id: u.id,
+          name: u.name || 'Guitarist',
+          email: u.email || '',
+          avatar_url: u.avatar_url || '',
+        };
+      }
+    } catch {
+      // Use DEFAULT_AUTHOR
+    }
+
     const tabs = getLocalTabs();
     const maxId = tabs.reduce((max, t) => Math.max(max, t.id), 0);
     const newTab: GuitarTab = {
       id: maxId + 1,
+      user_id: payload.user_id || localAuthor.id,
+      author: localAuthor,
       title: payload.title.trim(),
       artist: payload.artist.trim(),
       version_name: payload.version_name?.trim() || 'Chords',
@@ -271,7 +367,7 @@ export const api = {
   },
 
   /**
-   * Update an existing guitar tab.
+   * Update an existing guitar tab, enforcing that only the author who created it can edit it.
    */
   async updateTab(id: number, payload: TabUpdate): Promise<GuitarTab> {
     const now = new Date().toISOString();
@@ -288,24 +384,54 @@ export const api = {
       if (payload.is_favorite !== undefined) updateData.is_favorite = payload.is_favorite;
 
       try {
-        const { data, error } = await supabase.from('tabs').update(updateData).eq('id', id).select().single();
-        if (error) throw error;
+        const { data, error } = await supabase
+          .from('tabs')
+          .update(updateData)
+          .eq('id', id)
+          .select('*, author:users(id, name, avatar_url)')
+          .single();
+
+        if (error) {
+          if (error.code === '42501' || error.message.toLowerCase().includes('policy')) {
+            throw new Error('Permission denied: You can only edit guitar tabs that you created.');
+          }
+          throw error;
+        }
         return data;
-      } catch (err) {
-        // Fallback retry without version_name if Supabase table has not run the column migration
+      } catch (err: any) {
+        if (err?.message?.includes('Permission denied')) throw err;
+
+        // Fallback retry without version_name
         const compatData = { ...updateData };
         delete compatData.version_name;
         const { data, error } = await supabase.from('tabs').update(compatData).eq('id', id).select().single();
-        if (error) throw error;
+        if (error) {
+          if (error.code === '42501' || error.message.toLowerCase().includes('policy')) {
+            throw new Error('Permission denied: You can only edit guitar tabs that you created.');
+          }
+          throw error;
+        }
         return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
       }
     }
-
 
     // Local Storage
     const tabs = getLocalTabs();
     const index = tabs.findIndex((t) => t.id === id);
     if (index === -1) throw new Error(`Tab ${id} not found`);
+
+    // Verify creator in local mode if a user is logged in
+    try {
+      const storedUser = localStorage.getItem('tabber_local_auth_user');
+      if (storedUser) {
+        const localUser = JSON.parse(storedUser);
+        if (tabs[index].user_id && localUser?.id && tabs[index].user_id !== localUser.id) {
+          throw new Error('Permission denied: You can only edit guitar tabs that you created.');
+        }
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('Permission denied')) throw err;
+    }
 
     const updated: GuitarTab = {
       ...tabs[index],
@@ -326,17 +452,37 @@ export const api = {
   },
 
   /**
-   * Delete a guitar tab by ID.
+   * Delete a guitar tab by ID, enforcing that only the author who created it can delete it.
    */
   async deleteTab(id: number): Promise<void> {
     if (isSupabaseConfigured() && supabase) {
       const { error } = await supabase.from('tabs').delete().eq('id', id);
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42501' || error.message.toLowerCase().includes('policy')) {
+          throw new Error('Permission denied: You can only delete guitar tabs that you created.');
+        }
+        throw error;
+      }
       return;
     }
 
     // Local Storage
     const tabs = getLocalTabs();
+    const target = tabs.find((t) => t.id === id);
+    if (target) {
+      try {
+        const storedUser = localStorage.getItem('tabber_local_auth_user');
+        if (storedUser) {
+          const localUser = JSON.parse(storedUser);
+          if (target.user_id && localUser?.id && target.user_id !== localUser.id) {
+            throw new Error('Permission denied: You can only delete guitar tabs that you created.');
+          }
+        }
+      } catch (err: any) {
+        if (err?.message?.includes('Permission denied')) throw err;
+      }
+    }
+
     saveLocalTabs(tabs.filter((t) => t.id !== id));
   },
 

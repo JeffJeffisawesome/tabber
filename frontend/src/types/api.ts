@@ -1,5 +1,5 @@
 /**
- * Type definitions matching the backend FastAPI guitar tab schemas.
+ * Type definitions matching the backend FastAPI guitar tab schemas and Supabase models.
  */
 
 export interface HealthResponse {
@@ -11,8 +11,26 @@ export interface HealthResponse {
 
 export type TabDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 
+export interface TabAuthor {
+  id: string;
+  email?: string;
+  name?: string;
+  avatar_url?: string;
+}
+
+export interface DbUser {
+  id: string;
+  email?: string;
+  name?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GuitarTab {
   id: number;
+  user_id?: string | null;
+  author?: TabAuthor | null;
   title: string;
   artist: string;
   version_name?: string;
@@ -26,6 +44,7 @@ export interface GuitarTab {
 }
 
 export interface TabCreate {
+  user_id?: string | null;
   title: string;
   artist: string;
   version_name?: string;
@@ -37,6 +56,7 @@ export interface TabCreate {
 }
 
 export interface TabUpdate {
+  user_id?: string | null;
   title?: string;
   artist?: string;
   version_name?: string;
@@ -46,7 +66,6 @@ export interface TabUpdate {
   content?: string;
   is_favorite?: boolean;
 }
-
 
 export interface TabFilter {
   q?: string;
@@ -80,5 +99,3 @@ export interface SongGroup {
   hasFavorite?: boolean;
   latestUpdatedAt?: string;
 }
-
-

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { GuitarTab } from '../types/api';
+import type { AuthUser } from '../services/auth';
 import { extractChordsFromSong } from '../utils/chordData';
 import ChordDiagram, { type ChordDiagramSize } from './ChordDiagram';
 import LyricChordView from './LyricChordView';
@@ -12,6 +13,7 @@ interface TabViewerProps {
   onEdit: (tab: GuitarTab) => void;
   onDelete: (id: number) => void;
   isLoggedIn?: boolean;
+  currentUser?: AuthUser | null;
   onRequestLogin?: (message: string) => void;
   onBackToList?: () => void;
   isMobile?: boolean;
@@ -26,6 +28,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   onEdit,
   onDelete,
   isLoggedIn = false,
+  currentUser = null,
   onRequestLogin,
   onBackToList,
   isMobile = false,
@@ -432,6 +435,21 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                 <span className={`badge badge-diff badge-diff-${tab.difficulty.toLowerCase()}`}>
                   {tab.difficulty}
                 </span>
+
+                {/* Author Badge */}
+                {(() => {
+                  const isOwnTab = Boolean(isLoggedIn && currentUser?.id && tab.user_id === currentUser.id);
+                  const authorName = tab.author?.name || 'Guitarist';
+                  const label = isOwnTab ? 'Added by you' : `Added by ${authorName}`;
+                  return (
+                    <span
+                      className="badge badge-author"
+                      title={isOwnTab ? 'Guitar tab created by you' : `Guitar tab created by ${authorName}`}
+                    >
+                      👤 {label}
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Version Switcher Ribbon (when song has multiple arrangements) */}
@@ -475,14 +493,36 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                 </button>
               )}
               {isLoggedIn ? (
-                <>
-                  <button className="btn-secondary" onClick={() => onEdit(tab)} title="Edit tab details & chords">
-                    ✏️ Edit
-                  </button>
-                  <button className="btn-danger-outline" onClick={() => onDelete(tab.id)} title="Delete this tab">
-                    🗑️ Delete
-                  </button>
-                </>
+                // Only the creator (author) can edit or delete this tab
+                (!tab.user_id || !currentUser?.id || tab.user_id === currentUser.id) ? (
+                  <>
+                    <button className="btn-secondary" onClick={() => onEdit(tab)} title="Edit tab details & chords">
+                      ✏️ Edit
+                    </button>
+                    <button className="btn-danger-outline" onClick={() => onDelete(tab.id)} title="Delete this tab">
+                      🗑️ Delete
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="btn-secondary btn-locked-action"
+                      disabled
+                      title="Only the author who created this tab can edit it"
+                      style={{ opacity: 0.55, cursor: 'not-allowed' }}
+                    >
+                      🔒 Edit (Author only)
+                    </button>
+                    <button
+                      className="btn-danger-outline btn-locked-action"
+                      disabled
+                      title="Only the author who created this tab can delete it"
+                      style={{ opacity: 0.55, cursor: 'not-allowed' }}
+                    >
+                      🔒 Delete (Author only)
+                    </button>
+                  </>
+                )
               ) : (
                 <>
                   <button

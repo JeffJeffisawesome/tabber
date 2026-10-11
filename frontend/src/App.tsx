@@ -254,21 +254,42 @@ const TabberApp: React.FC = () => {
     }
 
     if (editingTab) {
-      const updated = await api.updateTab(editingTab.id, payload);
-      setTabs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setSelectedTabId(updated.id);
-      if (isMobile) setMobileView('reader');
+      if (editingTab.user_id && user?.id && editingTab.user_id !== user.id) {
+        setError('Permission denied: You can only edit guitar tabs that you created.');
+        return;
+      }
+      try {
+        const updated = await api.updateTab(editingTab.id, payload);
+        setTabs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        setSelectedTabId(updated.id);
+        if (isMobile) setMobileView('reader');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to update guitar tab');
+      }
     } else {
-      const created = await api.createTab(payload);
-      setTabs((prev) => [created, ...prev]);
-      setSelectedTabId(created.id);
-      if (isMobile) setMobileView('reader');
+      try {
+        const created = await api.createTab({
+          ...payload,
+          user_id: user?.id,
+        });
+        setTabs((prev) => [created, ...prev]);
+        setSelectedTabId(created.id);
+        if (isMobile) setMobileView('reader');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to create guitar tab');
+      }
     }
   };
 
   const handleDeleteTab = async (id: number) => {
     if (!isLoggedIn) {
       openLoginModal('Please log in to delete guitar tabs.');
+      return;
+    }
+
+    const tabToDelete = tabs.find((t) => t.id === id);
+    if (tabToDelete?.user_id && user?.id && tabToDelete.user_id !== user.id) {
+      setError('Permission denied: You can only delete guitar tabs that you created.');
       return;
     }
 
@@ -309,6 +330,10 @@ const TabberApp: React.FC = () => {
   const openEditTabModal = (tab: GuitarTab) => {
     if (!isLoggedIn) {
       openLoginModal('Please log in to edit guitar tabs.');
+      return;
+    }
+    if (tab.user_id && user?.id && tab.user_id !== user.id) {
+      setError('Permission denied: You can only edit guitar tabs that you created.');
       return;
     }
     setEditingTab(tab);
@@ -667,6 +692,7 @@ const TabberApp: React.FC = () => {
                 onEdit={openEditTabModal}
                 onDelete={handleDeleteTab}
                 isLoggedIn={isLoggedIn}
+                currentUser={user}
                 onRequestLogin={openLoginModal}
                 onBackToList={isMobile ? () => setMobileView('list') : undefined}
                 isMobile={isMobile}

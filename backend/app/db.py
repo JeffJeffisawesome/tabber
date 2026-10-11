@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.config import SUPABASE_KEY, SUPABASE_URL, is_supabase_configured
-from app.schemas import Tab, TabCreate, TabUpdate
+from app.schemas import Tab, TabCreate, TabUpdate, UserBase
 
 logger = logging.getLogger("tabber.db")
 
@@ -54,15 +54,32 @@ def get_sqlite_connection() -> sqlite3.Connection:
 
 def init_db() -> None:
     """Initialize SQLite database (fallback) and check Supabase connection."""
-
+    now = datetime.now(timezone.utc).isoformat()
 
     # Initialize SQLite fallback
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
+
+        # 1. Create users table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT,
+                name TEXT,
+                avatar_url TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+
+        # 2. Create tabs table
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS tabs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT REFERENCES users(id),
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL,
                 version_name TEXT DEFAULT 'Chords',
@@ -76,24 +93,54 @@ def init_db() -> None:
             );
             """
         )
-        # Automatic SQLite migration: ensure version_name column exists
+
+        # Automatic SQLite migration: ensure version_name and user_id columns exist
         cursor.execute("PRAGMA table_info(tabs);")
         existing_cols = [col[1] for col in cursor.fetchall()]
         if "version_name" not in existing_cols:
             cursor.execute("ALTER TABLE tabs ADD COLUMN version_name TEXT DEFAULT 'Chords';")
+        if "user_id" not in existing_cols:
+            cursor.execute("ALTER TABLE tabs ADD COLUMN user_id TEXT REFERENCES users(id);")
+
+        # 3. Seed initial primary author if users table is empty
+        cursor.execute("SELECT COUNT(*) as count FROM users;")
+        if cursor.fetchone()["count"] == 0:
+            cursor.execute(
+                """
+                INSERT INTO users (id, email, name, avatar_url, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    "user-jeffrey-zhu",
+                    "jeffrey@tabber.local",
+                    "Jeffrey Zhu",
+                    "",
+                    now,
+                    now,
+                ),
+            )
+
+        # Retrieve first user
+        cursor.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1;")
+        first_user = cursor.fetchone()
+        first_user_id = first_user["id"] if first_user else "user-jeffrey-zhu"
+
+        # 4. Backfill any existing tabs where user_id IS NULL to this first user
+        cursor.execute("UPDATE tabs SET user_id = ? WHERE user_id IS NULL;", (first_user_id,))
 
         cursor.execute("SELECT COUNT(*) as count FROM tabs;")
         if cursor.fetchone()["count"] == 0:
-            seed_sqlite_tabs(cursor)
+            seed_sqlite_tabs(cursor, first_user_id)
+
         conn.commit()
 
 
-
-def seed_sqlite_tabs(cursor: sqlite3.Cursor) -> None:
+def seed_sqlite_tabs(cursor: sqlite3.Cursor, author_id: str = "user-jeffrey-zhu") -> None:
     """Seed the SQLite database with well-formatted classic guitar tabs."""
     now = datetime.now(timezone.utc).isoformat()
     starter_tabs = [
         (
+            author_id,
             "Take Me Home, Country Roads",
             "John Denver",
             "Standard (E A D G B E)",
@@ -110,24 +157,13 @@ Country [G]roads, take me [D]home
 To the [Em]place I be[C]long
 West Vir[G]ginia, mountain [D]mama
 Take me [C]home, country [G]roads
-
-[Verse 2]
-[G]All my memories [Em]gather 'round her
-[D]Miner's lady, [C]stranger to blue [G]water
-[G]Dark and dusty, [Em]painted on the sky
-[D]Misty taste of moonshine, [C]teardrop in my [G]eye
-
-[Bridge]
-[Em]I hear her [D]voice in the [G]mornin' hour, she calls me
-The [C]radio re[G]minds me of my [D]home far away
-And [Em]drivin' down the [F]road, I get a [C]feelin'
-That I [G]should have been home [D]yesterday, yester[D7]day
 """,
             1,
             now,
             now,
         ),
         (
+            author_id,
             "Knockin' on Heaven's Door",
             "Bob Dylan",
             "Standard (E A D G B E)",
@@ -142,82 +178,6 @@ That I [G]should have been home [D]yesterday, yester[D7]day
 [G]I can't [D]use it any[C]more
 [G]It's gettin' [D]dark, too dark to [Am]see
 [G]I feel I'm [D]knockin' on heaven's [C]door
-
-[Chorus]
-[G]Knock, knock, [D]knockin' on heaven's [Am]door
-[G]Knock, knock, [D]knockin' on heaven's [C]door
-[G]Knock, knock, [D]knockin' on heaven's [Am]door
-[G]Knock, knock, [D]knockin' on heaven's [C]door
-""",
-            1,
-            now,
-            now,
-        ),
-        (
-            "Wish You Were Here (Intro)",
-            "Pink Floyd",
-            "Standard (E A D G B E)",
-            0,
-            "Beginner",
-            """[Intro Acoustic Riff]
-
-   Em7                  G
-e|-------------------|-------------------|
-B|-------3-----------|-------3-----------|
-G|-------0-----------|-------0-----------|
-D|---0h2---2p0-------|---0h2---2p0-------|
-A|-------------2-----|-------------2-----|
-E|-------------------|---------------3---|
-
-   Em7                  A7sus4
-e|-------------------|-------------------|
-B|-------3-----------|-------3-----------|
-G|-------0-----------|-------0-----------|
-D|---0h2---2p0-------|---0h2---2p0-------|
-A|-------------2-----|-------------0-----|
-E|-------------------|-------------------|
-
-   Em7                  G
-e|-------------------|-------------------|
-B|-------3-----------|-------3-----------|
-G|-------0-----------|-------0-----------|
-D|---0h2---2p0-------|---0h2---2p0-------|
-A|-------------2-----|-------------------|
-E|-------------------|---3---------------|
-
-[Verse]
-So, [C]so you think you can [D]tell
-Heaven from [Am]hell, blue skies from [G]pain
-Can you tell a green [D]field from a cold steel [C]rail?
-A smile from a [Am]veil? Do you think you can [G]tell?
-""",
-            1,
-            now,
-            now,
-        ),
-        (
-            "Blackbird (Intro)",
-            "The Beatles",
-            "Standard (E A D G B E)",
-            0,
-            "Intermediate",
-            """[Intro - Fingerstyle]
-
-   G                 Am7               G/B
-e|-------|---------|-------|---------|-------|---------|
-B|---0---|-----0---|---1---|-----1---|---3---|-----3---|
-G|-------|---0-----|-------|---0-----|-------|---0-----|
-D|-------|---------|-------|---------|-------|---------|
-A|-------|---------|---0---|---------|---2---|---------|
-E|---3---|---------|-------|---------|-------|---------|
-
-   G                     C
-e|-------|-------------|-------|---------|
-B|--12---|------12-----|---5---|-----5---|
-G|-------|---0---------|-------|---0-----|
-D|-------|-------------|-------|---------|
-A|--10---|-------------|---3---|---------|
-E|-------|-------------|-------|---------|
 """,
             1,
             now,
@@ -227,15 +187,15 @@ E|-------|-------------|-------|---------|
 
     cursor.executemany(
         """
-        INSERT INTO tabs (title, artist, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO tabs (user_id, title, artist, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """,
         starter_tabs,
     )
 
 
 def sqlite_row_to_tab(row) -> Tab:
-    """Convert an SQLite Row to Tab schema."""
+    """Convert an SQLite Row to Tab schema including author profile."""
     version_name = "Chords"
     try:
         if "version_name" in row.keys() and row["version_name"]:
@@ -243,8 +203,48 @@ def sqlite_row_to_tab(row) -> Tab:
     except Exception:
         pass
 
+    user_id = None
+    try:
+        if "user_id" in row.keys() and row["user_id"]:
+            user_id = str(row["user_id"])
+    except Exception:
+        pass
+
+    author = None
+    if user_id:
+        author_name = None
+        author_email = None
+        author_avatar = None
+        if "author_name" in row.keys() and row["author_name"]:
+            author_name = row["author_name"]
+            author_email = row["author_email"] if "author_email" in row.keys() else None
+            author_avatar = row["author_avatar_url"] if "author_avatar_url" in row.keys() else None
+        else:
+            # Look up author from users table if not already joined
+            try:
+                with get_sqlite_connection() as conn:
+                    u_cursor = conn.cursor()
+                    u_cursor.execute("SELECT * FROM users WHERE id = ?;", (user_id,))
+                    u_row = u_cursor.fetchone()
+                    if u_row:
+                        author_name = u_row["name"]
+                        author_email = u_row["email"]
+                        author_avatar = u_row["avatar_url"]
+            except Exception:
+                pass
+
+        if author_name or author_email:
+            author = UserBase(
+                id=user_id,
+                name=author_name or "Guitarist",
+                email=author_email or "",
+                avatar_url=author_avatar or "",
+            )
+
     return Tab(
         id=row["id"],
+        user_id=user_id,
+        author=author,
         title=row["title"],
         artist=row["artist"],
         version_name=version_name,
@@ -256,7 +256,6 @@ def sqlite_row_to_tab(row) -> Tab:
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )
-
 
 
 # =====================================================================
@@ -273,7 +272,11 @@ def list_tabs_db(
     client = get_supabase_client()
     if client is not None:
         try:
-            query = client.table("tabs").select("*")
+            try:
+                query = client.table("tabs").select("*, author:users(id, email, name, avatar_url)")
+            except Exception:
+                query = client.table("tabs").select("*")
+
             if difficulty and difficulty != "All":
                 query = query.eq("difficulty", difficulty)
             if favorite is not None:
@@ -300,27 +303,31 @@ def list_tabs_db(
         except Exception as e:
             logger.error(f"Supabase list_tabs error: {e}. Falling back to SQLite.")
 
-    # SQLite fallback
+    # SQLite fallback with author LEFT JOIN
     conditions = []
     params = []
     if q and q.strip():
         pat = f"%{q.strip()}%"
-        conditions.append("(title LIKE ? OR artist LIKE ? OR content LIKE ?)")
+        conditions.append("(t.title LIKE ? OR t.artist LIKE ? OR t.content LIKE ?)")
         params.extend([pat, pat, pat])
     if difficulty and difficulty != "All":
-        conditions.append("difficulty = ?")
+        conditions.append("t.difficulty = ?")
         params.append(difficulty)
     if favorite is not None:
-        conditions.append("is_favorite = ?")
+        conditions.append("t.is_favorite = ?")
         params.append(1 if favorite else 0)
     if tuning and tuning != "All":
-        conditions.append("tuning = ?")
+        conditions.append("t.tuning = ?")
         params.append(tuning)
 
-    sql = "SELECT * FROM tabs"
+    sql = """
+        SELECT t.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar_url
+        FROM tabs t
+        LEFT JOIN users u ON t.user_id = u.id
+    """
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
-    sql += " ORDER BY is_favorite DESC, updated_at DESC"
+    sql += " ORDER BY t.is_favorite DESC, t.updated_at DESC"
 
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
@@ -333,7 +340,11 @@ def get_tab_db(tab_id: int) -> Optional[Tab]:
     client = get_supabase_client()
     if client is not None:
         try:
-            res = client.table("tabs").select("*").eq("id", tab_id).execute()
+            try:
+                res = client.table("tabs").select("*, author:users(id, email, name, avatar_url)").eq("id", tab_id).execute()
+            except Exception:
+                res = client.table("tabs").select("*").eq("id", tab_id).execute()
+
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
             return None
@@ -342,18 +353,29 @@ def get_tab_db(tab_id: int) -> Optional[Tab]:
 
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tabs WHERE id = ?;", (tab_id,))
+        cursor.execute(
+            """
+            SELECT t.*, u.name as author_name, u.email as author_email, u.avatar_url as author_avatar_url
+            FROM tabs t
+            LEFT JOIN users u ON t.user_id = u.id
+            WHERE t.id = ?;
+            """,
+            (tab_id,),
+        )
         row = cursor.fetchone()
         return sqlite_row_to_tab(row) if row else None
 
 
-def create_tab_db(payload: TabCreate) -> Tab:
+def create_tab_db(payload: TabCreate, author_id: Optional[str] = None) -> Tab:
     """Insert a new tab into the active database."""
     now = datetime.now(timezone.utc).isoformat()
+    user_id = author_id or payload.user_id
+
     client = get_supabase_client()
     if client is not None:
         try:
             record = {
+                "user_id": user_id,
                 "title": payload.title.strip(),
                 "artist": payload.artist.strip(),
                 "version_name": payload.version_name or "Chords",
@@ -369,26 +391,27 @@ def create_tab_db(payload: TabCreate) -> Tab:
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
         except Exception as e:
-            logger.warning(f"Supabase insert failed: {e}. Retrying without version_name...")
+            logger.warning(f"Supabase insert failed: {e}. Retrying without version_name/user_id...")
             try:
-                compat_record = {k: v for k, v in record.items() if k != "version_name"}
+                compat_record = {k: v for k, v in record.items() if k not in ("version_name", "user_id")}
                 res = client.table("tabs").insert(compat_record).execute()
                 if res.data and len(res.data) > 0:
                     d = dict(res.data[0])
                     d["version_name"] = payload.version_name or "Chords"
+                    d["user_id"] = user_id
                     return Tab(**d)
             except Exception as e2:
                 logger.error(f"Supabase insert fallback failed: {e2}. Falling back to SQLite.")
-
 
     with get_sqlite_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tabs (title, artist, version_name, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO tabs (user_id, title, artist, version_name, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
+                user_id,
                 payload.title.strip(),
                 payload.artist.strip(),
                 payload.version_name or "Chords",
@@ -403,15 +426,18 @@ def create_tab_db(payload: TabCreate) -> Tab:
         )
         conn.commit()
         tab_id = cursor.lastrowid
-        cursor.execute("SELECT * FROM tabs WHERE id = ?;", (tab_id,))
-        return sqlite_row_to_tab(cursor.fetchone())
+        return get_tab_db(tab_id)
 
 
-def update_tab_db(tab_id: int, payload: TabUpdate) -> Optional[Tab]:
-    """Update an existing tab."""
+def update_tab_db(tab_id: int, payload: TabUpdate, current_user_id: Optional[str] = None) -> Optional[Tab]:
+    """Update an existing tab, enforcing that only the author who created it can edit it."""
     existing = get_tab_db(tab_id)
     if not existing:
         return None
+
+    # Enforce author permissions: only creator can edit
+    if current_user_id and existing.user_id and existing.user_id != current_user_id:
+        raise PermissionError("Only the author who created this tab can edit it.")
 
     now = datetime.now(timezone.utc).isoformat()
     update_data: Dict[str, Any] = {"updated_at": now}
@@ -439,7 +465,6 @@ def update_tab_db(tab_id: int, payload: TabUpdate) -> Optional[Tab]:
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
         except Exception as e:
-
             logger.error(f"Supabase update_tab error: {e}. Falling back to SQLite.")
 
     # SQLite fallback
@@ -449,12 +474,19 @@ def update_tab_db(tab_id: int, payload: TabUpdate) -> Optional[Tab]:
         cursor = conn.cursor()
         cursor.execute(f"UPDATE tabs SET {', '.join(set_clauses)} WHERE id = ?;", values)
         conn.commit()
-        cursor.execute("SELECT * FROM tabs WHERE id = ?;", (tab_id,))
-        return sqlite_row_to_tab(cursor.fetchone())
+        return get_tab_db(tab_id)
 
 
-def delete_tab_db(tab_id: int) -> bool:
-    """Delete a tab from the active database."""
+def delete_tab_db(tab_id: int, current_user_id: Optional[str] = None) -> bool:
+    """Delete a tab from the active database, enforcing that only the author can delete it."""
+    existing = get_tab_db(tab_id)
+    if not existing:
+        return False
+
+    # Enforce author permissions: only creator can delete
+    if current_user_id and existing.user_id and existing.user_id != current_user_id:
+        raise PermissionError("Only the author who created this tab can delete it.")
+
     client = get_supabase_client()
     if client is not None:
         try:
