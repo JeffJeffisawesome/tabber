@@ -34,7 +34,12 @@ export const TabViewer: React.FC<TabViewerProps> = ({
   isMobile = false,
   onToggleMaximizeLyrics,
 }) => {
-  const [fontSize, setFontSize] = useState<number>(15);
+  const [fontSize, setFontSize] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 12;
+    }
+    return 15;
+  });
 
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
   const [scrollSpeed, setScrollSpeed] = useState<number>(2);
@@ -349,21 +354,15 @@ export const TabViewer: React.FC<TabViewerProps> = ({
           <div className="compact-focus-actions">
             <button
               type="button"
-              className={`btn-compact-ctrl btn-compact-scroll ${isAutoScrolling ? 'active' : ''}`}
-              onClick={() => setIsAutoScrolling(!isAutoScrolling)}
-              title={isAutoScrolling ? 'Pause Auto-scroll' : '▶ Start Auto-scroll'}
-            >
-              {isAutoScrolling ? '⏸' : '▶ Scroll'}
-            </button>
-
-            <button
-              type="button"
               className="btn-compact-ctrl"
-              onClick={() => setFontSize((s) => Math.max(12, s - 1))}
+              onClick={() => setFontSize((s) => Math.max(8, s - 1))}
               title="Decrease font size"
             >
               A-
             </button>
+            <span className="compact-font-val" title={`Current font: ${fontSize}px`}>
+              {fontSize}px
+            </span>
             <button
               type="button"
               className="btn-compact-ctrl"
@@ -546,30 +545,32 @@ export const TabViewer: React.FC<TabViewerProps> = ({
 
           {/* Control Bar */}
           <div className="tab-controls-bar">
-            {/* Hands-Free Auto-Scroll */}
-            <div className="auto-scroll-group">
-              <button
-                className={`btn-scroll-toggle ${isAutoScrolling ? 'active' : ''}`}
-                onClick={() => setIsAutoScrolling(!isAutoScrolling)}
-                title="Auto-scroll down while playing"
-              >
-                {isAutoScrolling ? '⏸ Pause Scroll' : '▶ Hands-Free Auto-Scroll'}
-              </button>
+            {/* Hands-Free Auto-Scroll (Desktop only) */}
+            {!isMobile && (
+              <div className="auto-scroll-group">
+                <button
+                  className={`btn-scroll-toggle ${isAutoScrolling ? 'active' : ''}`}
+                  onClick={() => setIsAutoScrolling(!isAutoScrolling)}
+                  title="Auto-scroll down while playing"
+                >
+                  {isAutoScrolling ? '⏸ Pause Scroll' : '▶ Hands-Free Auto-Scroll'}
+                </button>
 
-              <div className="speed-control">
-                <span className="control-label">Speed:</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  value={scrollSpeed}
-                  onChange={(e) => setScrollSpeed(Number(e.target.value))}
-                  title={`Scroll Speed: ${scrollSpeed}`}
-                />
-                <span className="speed-val">{scrollSpeed}x</span>
+                <div className="speed-control">
+                  <span className="control-label">Speed:</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={scrollSpeed}
+                    onChange={(e) => setScrollSpeed(Number(e.target.value))}
+                    title={`Scroll Speed: ${scrollSpeed}`}
+                  />
+                  <span className="speed-val">{scrollSpeed}x</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Font Zoom, Chord Panel Toggle & Copy */}
             <div className="utility-group">
@@ -585,7 +586,7 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                 <span className="control-label">Font:</span>
                 <button
                   className="btn-tiny"
-                  onClick={() => setFontSize((s) => Math.max(12, s - 1))}
+                  onClick={() => setFontSize((s) => Math.max(8, s - 1))}
                   title="Decrease font size"
                 >
                   A-
