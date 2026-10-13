@@ -1,10 +1,18 @@
-import type { GuitarTab } from '../types/api';
+import type { GuitarTab, TabAuthor } from '../types/api';
 
 const now = new Date().toISOString();
+
+export const DEFAULT_AUTHOR: TabAuthor = {
+  id: 'user-jeffrey-zhu',
+  name: 'Jeffrey Zhu',
+  email: 'jeffrey@tabber.local',
+};
 
 export const STARTER_TABS: GuitarTab[] = [
   {
     id: 1,
+    user_id: DEFAULT_AUTHOR.id,
+    author: DEFAULT_AUTHOR,
     title: 'Take Me Home, Country Roads',
     artist: 'John Denver',
     version_name: 'Chords (Standard)',
@@ -41,6 +49,8 @@ That I [G]should have been home [D]yesterday, yester[D7]day
   },
   {
     id: 2,
+    user_id: DEFAULT_AUTHOR.id,
+    author: DEFAULT_AUTHOR,
     title: "Knockin' on Heaven's Door",
     artist: 'Bob Dylan',
     version_name: 'Chords (Standard)',
@@ -75,6 +85,8 @@ That I [G]should have been home [D]yesterday, yester[D7]day
   },
   {
     id: 3,
+    user_id: DEFAULT_AUTHOR.id,
+    author: DEFAULT_AUTHOR,
     title: 'Wish You Were Here',
     artist: 'Pink Floyd',
     version_name: 'Intro Riff & Chords',
@@ -111,6 +123,8 @@ A smile from a [Am]veil? Do you think you can [G]tell?
   },
   {
     id: 4,
+    user_id: DEFAULT_AUTHOR.id,
+    author: DEFAULT_AUTHOR,
     title: 'Blackbird',
     artist: 'The Beatles',
     version_name: 'Fingerstyle Intro',
@@ -141,6 +155,8 @@ E|-------|-------------|-------|---------|
   },
   {
     id: 5,
+    user_id: DEFAULT_AUTHOR.id,
+    author: DEFAULT_AUTHOR,
     title: 'Blackbird',
     artist: 'The Beatles',
     version_name: 'Chords & Lyrics',

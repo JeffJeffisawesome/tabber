@@ -1,4 +1,4 @@
-"""Pydantic validation models for guitar tabs and system health."""
+"""Pydantic validation models for guitar tabs, users, and system health."""
 
 from datetime import datetime
 from typing import Optional
@@ -13,6 +13,23 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Current server UTC timestamp")
 
 
+class UserBase(BaseModel):
+    """Basic user profile information."""
+    id: str = Field(..., description="Unique user UUID or string ID")
+    email: Optional[str] = Field(None, description="User email address")
+    name: Optional[str] = Field(None, description="Display name")
+    avatar_url: Optional[str] = Field(None, description="User avatar image URL")
+
+
+class User(UserBase):
+    """Full user schema with timestamps."""
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+
+    class Config:
+        from_attributes = True
+
+
 class TabBase(BaseModel):
     """Base schema for a guitar tablature."""
     title: str = Field(..., min_length=1, max_length=150, description="Song title")
@@ -23,6 +40,7 @@ class TabBase(BaseModel):
     difficulty: str = Field(default="Intermediate", max_length=20, description="Beginner, Intermediate, or Advanced")
     content: str = Field(..., min_length=1, description="Monospaced ASCII guitar tab and/or chord text")
     is_favorite: bool = Field(default=False, description="Whether marked as favorite")
+    user_id: Optional[str] = Field(default=None, description="Author user ID (foreign key)")
 
 
 class TabCreate(TabBase):
@@ -40,7 +58,7 @@ class TabUpdate(BaseModel):
     difficulty: Optional[str] = Field(None, max_length=20)
     content: Optional[str] = Field(None, min_length=1)
     is_favorite: Optional[bool] = None
-
+    user_id: Optional[str] = Field(None, description="Author user ID")
 
 
 class Tab(TabBase):
@@ -48,6 +66,7 @@ class Tab(TabBase):
     id: int = Field(..., description="Unique integer ID")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
+    author: Optional[UserBase] = Field(default=None, description="Author user details")
 
     class Config:
         from_attributes = True
@@ -75,5 +94,3 @@ class TabImportResponse(BaseModel):
     """Response payload containing parsed tab data and optionally saved tab."""
     tab: TabCreate
     saved_tab: Optional[Tab] = None
-
-
