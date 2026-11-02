@@ -790,6 +790,131 @@
   gap: 0.25rem;
 }
 
+.badge-strumming {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Strumming Banner in TabViewer */
+.tab-viewer-strumming-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+  padding: 0.4rem 0.75rem;
+  background: #fdfaf5;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.strumming-banner-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* Strumming Visualizer */
+.strumming-visualizer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.strumming-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex-wrap: wrap;
+}
+
+.strum-stroke-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.strumming-visualizer.size-compact .strum-stroke-pill {
+  min-width: 22px;
+  padding: 0.2rem 0.32rem;
+  font-size: 0.7rem;
+}
+
+.strumming-visualizer.size-normal .strum-stroke-pill {
+  min-width: 30px;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+.strum-arrow {
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.strum-label {
+  font-size: 0.68em;
+  opacity: 0.9;
+  margin-top: 0.1rem;
+  letter-spacing: 0.02em;
+}
+
+.strum-step-idx {
+  display: none;
+}
+
+.strum-stroke-pill.strum-down {
+  background-color: #b86214;
+  color: #fff;
+  border: 1px solid #984f0c;
+  box-shadow: 0 1px 2px rgba(184, 98, 20, 0.15);
+}
+
+.strum-stroke-pill.strum-up {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.strum-stroke-pill.strum-rest {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border: 1px dashed #cbd5e1;
+}
+
+.strum-stroke-pill.strum-mute {
+  background-color: #334155;
+  color: #f8fafc;
+  border: 1px solid #1e293b;
+}
+
+.strumming-raw-text {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: rgba(44, 34, 26, 0.05);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
 /* Arrangements Ribbon in TabViewer Header */
 .tab-viewer-version-ribbon {
   display: flex;
@@ -1603,6 +1728,167 @@
   box-shadow: 0 0 0 2px rgba(184, 98, 20, 0.15);
 }
 
+/* Strumming Pattern Builder Card in Editor */
+.editor-strumming-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.editor-strumming-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editor-strumming-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.editor-strumming-title .optional-tag {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.btn-strumming-clear {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-strumming-clear:hover {
+  color: var(--danger);
+  text-decoration: underline;
+}
+
+.editor-strumming-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.strumming-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.strumming-builder-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.btn-strum-builder {
+  background-color: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.btn-strum-builder:hover {
+  border-color: var(--primary);
+  background-color: #fef3c7;
+  color: var(--primary);
+}
+
+.strumming-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding-top: 0.1rem;
+}
+
+.strumming-presets-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.strumming-presets-list {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.btn-strumming-preset {
+  background-color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-strumming-preset .preset-pattern-sub {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.btn-strumming-preset:hover {
+  background-color: #fef3c7;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-strumming-preset.active {
+  background-color: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.btn-strumming-preset.active .preset-pattern-sub {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.editor-strumming-preview {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.editor-strumming-preview .preview-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
 /* Quick Chord Inserter Bar */
 .chord-tools-card {
   background-color: var(--bg-secondary);
@@ -2084,6 +2370,13 @@
 
   .tab-viewer-title-group {
     width: 100%;
+  }
+
+  .tab-viewer-strumming-banner {
+    padding: 0.35rem 0.55rem;
+    gap: 0.45rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .tab-viewer-title {

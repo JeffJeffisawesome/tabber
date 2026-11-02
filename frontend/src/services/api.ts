@@ -291,6 +291,7 @@ export const api = {
         tuning: payload.tuning,
         capo: payload.capo,
         difficulty: payload.difficulty,
+        strumming_pattern: payload.strumming_pattern?.trim() || null,
         content: payload.content,
         is_favorite: Boolean(payload.is_favorite),
         created_at: now,
@@ -310,20 +311,29 @@ export const api = {
         if (error) throw error;
         return data;
       } catch (err: any) {
-        // Fallback retry without author relation or version_name if migration is partial
+        // Fallback retry without author relation, version_name, or strumming_pattern if migration is partial
         const compatRecord = { ...record };
         delete compatRecord.version_name;
+        delete compatRecord.strumming_pattern;
         try {
           const { data, error } = await supabase.from('tabs').insert(compatRecord).select().single();
           if (error) throw error;
-          return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+          return {
+            ...data,
+            version_name: payload.version_name?.trim() || 'Chords',
+            strumming_pattern: payload.strumming_pattern?.trim() || null,
+          };
         } catch (err2: any) {
           // If foreign key constraint failed because users table is not yet created, retry without user_id
           const noUserRecord = { ...compatRecord };
           delete noUserRecord.user_id;
           const { data, error } = await supabase.from('tabs').insert(noUserRecord).select().single();
           if (error) throw error;
-          return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+          return {
+            ...data,
+            version_name: payload.version_name?.trim() || 'Chords',
+            strumming_pattern: payload.strumming_pattern?.trim() || null,
+          };
         }
       }
     }
@@ -357,6 +367,7 @@ export const api = {
       tuning: payload.tuning,
       capo: payload.capo,
       difficulty: payload.difficulty,
+      strumming_pattern: payload.strumming_pattern?.trim() || null,
       content: payload.content,
       is_favorite: Boolean(payload.is_favorite),
       created_at: now,
@@ -380,6 +391,9 @@ export const api = {
       if (payload.tuning !== undefined) updateData.tuning = payload.tuning;
       if (payload.capo !== undefined) updateData.capo = payload.capo;
       if (payload.difficulty !== undefined) updateData.difficulty = payload.difficulty;
+      if (payload.strumming_pattern !== undefined) {
+        updateData.strumming_pattern = payload.strumming_pattern ? payload.strumming_pattern.trim() : null;
+      }
       if (payload.content !== undefined) updateData.content = payload.content;
       if (payload.is_favorite !== undefined) updateData.is_favorite = payload.is_favorite;
 
@@ -401,9 +415,10 @@ export const api = {
       } catch (err: any) {
         if (err?.message?.includes('Permission denied')) throw err;
 
-        // Fallback retry without version_name
+        // Fallback retry without version_name and strumming_pattern if migration is pending
         const compatData = { ...updateData };
         delete compatData.version_name;
+        delete compatData.strumming_pattern;
         const { data, error } = await supabase.from('tabs').update(compatData).eq('id', id).select().single();
         if (error) {
           if (error.code === '42501' || error.message.toLowerCase().includes('policy')) {
@@ -411,7 +426,11 @@ export const api = {
           }
           throw error;
         }
-        return { ...data, version_name: payload.version_name?.trim() || 'Chords' };
+        return {
+          ...data,
+          version_name: payload.version_name?.trim() || 'Chords',
+          strumming_pattern: payload.strumming_pattern?.trim() || null,
+        };
       }
     }
 
@@ -639,6 +658,21 @@ export const api = {
     const versionNum = Number(tabInfo.version || 1);
     const versionName = versionNum > 1 ? `${rawType} (Ver ${versionNum})` : rawType;
 
+    let strummingPattern: string | null = null;
+    const strummings = tabView.strummings || [];
+    if (Array.isArray(strummings) && strummings.length > 0 && strummings[0]?.denote) {
+      const rawDenote = String(strummings[0].denote).trim();
+      const chars: string[] = [];
+      for (const c of rawDenote) {
+        if (c.toLowerCase() === 'd') chars.push('D');
+        else if (c.toLowerCase() === 'u') chars.push('U');
+        else if (['-', ' ', '.', '_'].includes(c)) chars.push('-');
+        else if (c.toLowerCase() === 'x') chars.push('x');
+        else chars.push(c.toUpperCase());
+      }
+      strummingPattern = chars.join(' ').trim().slice(0, 100);
+    }
+
     const tabCreate: TabCreate = {
       title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
       artist: tabInfo.artist_name || pageData.artist_name || 'Unknown Artist',
@@ -646,6 +680,7 @@ export const api = {
       tuning,
       capo,
       difficulty,
+      strumming_pattern: strummingPattern,
       content: cleanContent,
       is_favorite: false,
     };

@@ -4,6 +4,7 @@ import type { AuthUser } from '../services/auth';
 import { extractChordsFromSong } from '../utils/chordData';
 import ChordDiagram, { type ChordDiagramSize } from './ChordDiagram';
 import LyricChordView from './LyricChordView';
+import StrummingVisualizer from './StrummingVisualizer';
 
 interface TabViewerProps {
   tab: GuitarTab;
@@ -435,6 +436,13 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                   {tab.difficulty}
                 </span>
 
+                {/* Strumming Pattern Badge */}
+                {tab.strumming_pattern && (
+                  <span className="badge badge-strumming" title={`Strumming Pattern: ${tab.strumming_pattern}`}>
+                    🪕 {tab.strumming_pattern}
+                  </span>
+                )}
+
                 {/* Author Badge */}
                 {(() => {
                   const isOwnTab = Boolean(isLoggedIn && currentUser?.id && tab.user_id === currentUser.id);
@@ -475,6 +483,14 @@ export const TabViewer: React.FC<TabViewerProps> = ({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Strumming Pattern Visual Banner */}
+              {tab.strumming_pattern && (
+                <div className="tab-viewer-strumming-banner">
+                  <span className="strumming-banner-title">🪕 Strumming Pattern:</span>
+                  <StrummingVisualizer pattern={tab.strumming_pattern} size="compact" showRawLabel />
                 </div>
               )}
             </div>

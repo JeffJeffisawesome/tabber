@@ -140,6 +140,27 @@ def parse_ug_page(html_doc: str, source_url: str = "") -> TabCreate:
     if not content:
         raise ValueError("The tab content appears to be empty or restricted.")
 
+    # Strumming pattern extraction (if provided by UG tab_view)
+    strumming_pattern = None
+    strummings = tab_view.get("strummings") or []
+    if isinstance(strummings, list) and len(strummings) > 0:
+        first_strum = strummings[0]
+        if isinstance(first_strum, dict) and first_strum.get("denote"):
+            raw_denote = str(first_strum["denote"]).strip()
+            chars = []
+            for c in raw_denote:
+                if c.lower() == "d":
+                    chars.append("D")
+                elif c.lower() == "u":
+                    chars.append("U")
+                elif c in ("-", " ", ".", "_"):
+                    chars.append("-")
+                elif c.lower() == "x":
+                    chars.append("x")
+                else:
+                    chars.append(c.upper())
+            strumming_pattern = " ".join(chars).strip()[:100]
+
     return TabCreate(
         title=title[:150],
         artist=artist[:150],
@@ -147,6 +168,7 @@ def parse_ug_page(html_doc: str, source_url: str = "") -> TabCreate:
         tuning=tuning,
         capo=capo,
         difficulty=difficulty,
+        strumming_pattern=strumming_pattern,
         content=content,
         is_favorite=False,
     )

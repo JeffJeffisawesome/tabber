@@ -162,6 +162,21 @@ export async function scrapeUGUrl(rawUrl: string): Promise<ScrapedTab> {
   const versionNum = Number(tabInfo.version || 1);
   const versionName = versionNum > 1 ? `${rawType} (Ver ${versionNum})` : rawType;
 
+  let strummingPattern: string | null = null;
+  const strummings = tabView.strummings || [];
+  if (Array.isArray(strummings) && strummings.length > 0 && strummings[0]?.denote) {
+    const rawDenote = String(strummings[0].denote).trim();
+    const chars: string[] = [];
+    for (const c of rawDenote) {
+      if (c.toLowerCase() === 'd') chars.push('D');
+      else if (c.toLowerCase() === 'u') chars.push('U');
+      else if (['-', ' ', '.', '_'].includes(c)) chars.push('-');
+      else if (c.toLowerCase() === 'x') chars.push('x');
+      else chars.push(c.toUpperCase());
+    }
+    strummingPattern = chars.join(' ').trim().slice(0, 100);
+  }
+
   return {
     title: tabInfo.song_name || pageData.song_name || 'Untitled Tab',
     artist: tabInfo.artist_name || pageData.artist_name || 'Unknown Artist',
@@ -169,6 +184,7 @@ export async function scrapeUGUrl(rawUrl: string): Promise<ScrapedTab> {
     tuning,
     capo,
     difficulty,
+    strumming_pattern: strummingPattern,
     content,
     is_favorite: false,
   };
