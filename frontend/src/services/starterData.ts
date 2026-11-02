@@ -19,6 +19,7 @@ export const STARTER_TABS: GuitarTab[] = [
     tuning: 'Standard (E A D G B E)',
     capo: 2,
     difficulty: 'Beginner',
+    strumming_pattern: 'D - D U - U D -',
     content: `[Verse 1]
 [G]Almost heaven, [Em]West Virginia
 [D]Blue Ridge Mountains, [C]Shenandoah [G]River
@@ -57,6 +58,7 @@ That I [G]should have been home [D]yesterday, yester[D7]day
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Beginner',
+    strumming_pattern: 'D - D U - U D U',
     content: `[Intro]
 [G]   [D]   [Am]
 [G]   [D]   [C]
@@ -93,6 +95,7 @@ That I [G]should have been home [D]yesterday, yester[D7]day
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Intermediate',
+    strumming_pattern: 'D - D - D U - U D - D - D U D U',
     content: `[Intro Riff]
 
    Em7                  G
@@ -131,6 +134,7 @@ A smile from a [Am]veil? Do you think you can [G]tell?
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Intermediate',
+    strumming_pattern: null,
     content: `[Intro - Fingerstyle]
 
    G                 Am7               G/B
@@ -163,6 +167,7 @@ E|-------|-------------|-------|---------|
     tuning: 'Standard (E A D G B E)',
     capo: 0,
     difficulty: 'Beginner',
+    strumming_pattern: 'D D U U D U',
     content: `[Verse 1]
 [G]Blackbird [Am7]singing in the [G/B]dead of night
 [C]Take these [C#dim]broken wings and [D]learn to [D#dim]fly

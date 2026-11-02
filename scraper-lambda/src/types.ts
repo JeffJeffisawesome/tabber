@@ -18,6 +18,7 @@ export interface ScrapedTab {
   tuning: string;
   capo: number;
   difficulty: TabDifficulty;
+  strumming_pattern?: string | null;
   content: string;
   is_favorite: boolean;
 }

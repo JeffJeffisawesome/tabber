@@ -38,6 +38,7 @@ class TabBase(BaseModel):
     tuning: str = Field(default="Standard (E A D G B E)", max_length=50, description="Guitar tuning")
     capo: int = Field(default=0, ge=0, le=12, description="Capo fret position (0 = no capo)")
     difficulty: str = Field(default="Intermediate", max_length=20, description="Beginner, Intermediate, or Advanced")
+    strumming_pattern: Optional[str] = Field(default=None, max_length=100, description="Optional guitar strumming pattern, e.g. D - D U - U D -")
     content: str = Field(..., min_length=1, description="Monospaced ASCII guitar tab and/or chord text")
     is_favorite: bool = Field(default=False, description="Whether marked as favorite")
     user_id: Optional[str] = Field(default=None, description="Author user ID (foreign key)")
@@ -56,6 +57,7 @@ class TabUpdate(BaseModel):
     tuning: Optional[str] = Field(None, max_length=50)
     capo: Optional[int] = Field(None, ge=0, le=12)
     difficulty: Optional[str] = Field(None, max_length=20)
+    strumming_pattern: Optional[str] = Field(None, max_length=100)
     content: Optional[str] = Field(None, min_length=1)
     is_favorite: Optional[bool] = None
     user_id: Optional[str] = Field(None, description="Author user ID")

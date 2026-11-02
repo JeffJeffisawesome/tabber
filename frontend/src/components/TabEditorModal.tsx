@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import type { GuitarTab, TabCreate, TabDifficulty } from '../types/api';
 import { api } from '../services/api';
+import { STRUMMING_PRESETS } from '../utils/strumming';
+import { StrummingVisualizer } from './StrummingVisualizer';
 
 interface TabEditorModalProps {
   initialTab?: GuitarTab | null;
@@ -65,6 +67,9 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
   const [difficulty, setDifficulty] = useState<TabDifficulty>(
     initialTab?.difficulty || initialTabCreate?.difficulty || 'Intermediate'
   );
+  const [strummingPattern, setStrummingPattern] = useState<string>(
+    initialTab?.strumming_pattern || initialTabCreate?.strumming_pattern || ''
+  );
   const [content, setContent] = useState(
     initialTab?.content || initialTabCreate?.content || CHORD_LYRIC_TEMPLATE
   );
@@ -126,6 +131,9 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
       if (tab.version_name) {
         setVersionName(tab.version_name);
       }
+      if (tab.strumming_pattern) {
+        setStrummingPattern(tab.strumming_pattern);
+      }
       setContent(tab.content);
       setImportStatus({
         type: 'success',
@@ -141,6 +149,13 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
     }
   };
 
+  const appendStroke = (symbol: string) => {
+    setStrummingPattern((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return symbol;
+      return `${trimmed} ${symbol}`;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +176,7 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
         tuning: finalTuning,
         capo: Number(capo) || 0,
         difficulty,
+        strumming_pattern: strummingPattern.trim() || undefined,
         content,
         is_favorite: isFavorite,
       });
@@ -342,6 +358,96 @@ export const TabEditorModal: React.FC<TabEditorModalProps> = ({
                 <option value="Advanced">Advanced</option>
               </select>
             </div>
+          </div>
+
+          {/* Strumming Pattern Builder (Optional) */}
+          <div className="editor-strumming-card">
+            <div className="editor-strumming-header">
+              <span className="editor-strumming-title">
+                🪕 Strumming Pattern <span className="optional-tag">(Optional)</span>
+              </span>
+              {strummingPattern && (
+                <button
+                  type="button"
+                  className="btn-text-link btn-strumming-clear"
+                  onClick={() => setStrummingPattern('')}
+                  title="Clear strumming pattern"
+                >
+                  Clear Pattern
+                </button>
+              )}
+            </div>
+
+            <div className="editor-strumming-input-row">
+              <input
+                id="tab-strumming"
+                type="text"
+                className="form-input strumming-input"
+                placeholder="e.g. D - D U - U D - or D DU UDU (or use presets below)"
+                value={strummingPattern}
+                onChange={(e) => setStrummingPattern(e.target.value)}
+              />
+              <div className="strumming-builder-buttons">
+                <button
+                  type="button"
+                  className="btn-strum-builder btn-strum-down"
+                  onClick={() => appendStroke('D')}
+                  title="Add Downstroke (D)"
+                >
+                  ↓ Down
+                </button>
+                <button
+                  type="button"
+                  className="btn-strum-builder btn-strum-up"
+                  onClick={() => appendStroke('U')}
+                  title="Add Upstroke (U)"
+                >
+                  ↑ Up
+                </button>
+                <button
+                  type="button"
+                  className="btn-strum-builder btn-strum-rest"
+                  onClick={() => appendStroke('-')}
+                  title="Add Rest / Miss (-)"
+                >
+                  – Rest
+                </button>
+                <button
+                  type="button"
+                  className="btn-strum-builder btn-strum-mute"
+                  onClick={() => appendStroke('x')}
+                  title="Add Mute / Slap (x)"
+                >
+                  ✕ Mute
+                </button>
+              </div>
+            </div>
+
+            {/* Presets Chips */}
+            <div className="strumming-presets-row">
+              <span className="strumming-presets-label">Popular Presets:</span>
+              <div className="strumming-presets-list">
+                {STRUMMING_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`btn-strumming-preset ${strummingPattern.trim() === p.pattern ? 'active' : ''}`}
+                    onClick={() => setStrummingPattern(p.pattern)}
+                    title={`${p.name} (${p.timeSignature}): ${p.description}`}
+                  >
+                    {p.name} <span className="preset-pattern-sub">{p.pattern}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Visual Preview */}
+            {strummingPattern.trim() && (
+              <div className="editor-strumming-preview">
+                <span className="preview-label">Live Rhythm Preview:</span>
+                <StrummingVisualizer pattern={strummingPattern} size="normal" showRawLabel />
+              </div>
+            )}
           </div>
 
           {/* Quick Insert Chords & Format Helper */}

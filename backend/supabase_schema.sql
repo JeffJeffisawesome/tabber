@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.tabs (
     tuning TEXT NOT NULL DEFAULT 'Standard (E A D G B E)',
     capo INT DEFAULT 0,
     difficulty TEXT NOT NULL DEFAULT 'Intermediate',
+    strumming_pattern TEXT,
     content TEXT NOT NULL,
     is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.tabs (
 -- Migration for existing installations: ensure columns exist
 ALTER TABLE public.tabs ADD COLUMN IF NOT EXISTS version_name TEXT NOT NULL DEFAULT 'Chords';
 ALTER TABLE public.tabs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.tabs ADD COLUMN IF NOT EXISTS strumming_pattern TEXT;
 
 -- 3. Automatic Trigger to sync new Auth users into public.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()

@@ -37,6 +37,7 @@ export interface GuitarTab {
   tuning: string;
   capo: number;
   difficulty: TabDifficulty;
+  strumming_pattern?: string | null;
   content: string;
   is_favorite: boolean;
   created_at: string;
@@ -51,6 +52,7 @@ export interface TabCreate {
   tuning: string;
   capo: number;
   difficulty: TabDifficulty;
+  strumming_pattern?: string | null;
   content: string;
   is_favorite?: boolean;
 }
@@ -63,6 +65,7 @@ export interface TabUpdate {
   tuning?: string;
   capo?: number;
   difficulty?: TabDifficulty;
+  strumming_pattern?: string | null;
   content?: string;
   is_favorite?: boolean;
 }

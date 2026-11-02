@@ -86,6 +86,7 @@ def init_db() -> None:
                 tuning TEXT NOT NULL DEFAULT 'Standard (E A D G B E)',
                 capo INTEGER DEFAULT 0,
                 difficulty TEXT NOT NULL DEFAULT 'Intermediate',
+                strumming_pattern TEXT,
                 content TEXT NOT NULL,
                 is_favorite BOOLEAN NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
@@ -94,13 +95,15 @@ def init_db() -> None:
             """
         )
 
-        # Automatic SQLite migration: ensure version_name and user_id columns exist
+        # Automatic SQLite migration: ensure version_name, user_id, and strumming_pattern columns exist
         cursor.execute("PRAGMA table_info(tabs);")
         existing_cols = [col[1] for col in cursor.fetchall()]
         if "version_name" not in existing_cols:
             cursor.execute("ALTER TABLE tabs ADD COLUMN version_name TEXT DEFAULT 'Chords';")
         if "user_id" not in existing_cols:
             cursor.execute("ALTER TABLE tabs ADD COLUMN user_id TEXT REFERENCES users(id);")
+        if "strumming_pattern" not in existing_cols:
+            cursor.execute("ALTER TABLE tabs ADD COLUMN strumming_pattern TEXT;")
 
         # 3. Seed initial primary author if users table is empty
         cursor.execute("SELECT COUNT(*) as count FROM users;")
@@ -146,6 +149,7 @@ def seed_sqlite_tabs(cursor: sqlite3.Cursor, author_id: str = "user-jeffrey-zhu"
             "Standard (E A D G B E)",
             2,
             "Beginner",
+            "D - D U - U D -",
             """[Verse 1]
 [G]Almost heaven, [Em]West Virginia
 [D]Blue Ridge Mountains, [C]Shenandoah [G]River
@@ -169,6 +173,7 @@ Take me [C]home, country [G]roads
             "Standard (E A D G B E)",
             0,
             "Beginner",
+            "D - D U - U D U",
             """[Intro]
 [G]   [D]   [Am]
 [G]   [D]   [C]
@@ -187,8 +192,8 @@ Take me [C]home, country [G]roads
 
     cursor.executemany(
         """
-        INSERT INTO tabs (user_id, title, artist, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO tabs (user_id, title, artist, tuning, capo, difficulty, strumming_pattern, content, is_favorite, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """,
         starter_tabs,
     )
@@ -207,6 +212,13 @@ def sqlite_row_to_tab(row) -> Tab:
     try:
         if "user_id" in row.keys() and row["user_id"]:
             user_id = str(row["user_id"])
+    except Exception:
+        pass
+
+    strumming_pattern = None
+    try:
+        if "strumming_pattern" in row.keys() and row["strumming_pattern"]:
+            strumming_pattern = str(row["strumming_pattern"])
     except Exception:
         pass
 
@@ -251,6 +263,7 @@ def sqlite_row_to_tab(row) -> Tab:
         tuning=row["tuning"],
         capo=row["capo"],
         difficulty=row["difficulty"],
+        strumming_pattern=strumming_pattern,
         content=row["content"],
         is_favorite=bool(row["is_favorite"]),
         created_at=str(row["created_at"]),
@@ -382,6 +395,7 @@ def create_tab_db(payload: TabCreate, author_id: Optional[str] = None) -> Tab:
                 "tuning": payload.tuning,
                 "capo": payload.capo,
                 "difficulty": payload.difficulty,
+                "strumming_pattern": payload.strumming_pattern.strip() if payload.strumming_pattern else None,
                 "content": payload.content,
                 "is_favorite": payload.is_favorite,
                 "created_at": now,
@@ -391,14 +405,15 @@ def create_tab_db(payload: TabCreate, author_id: Optional[str] = None) -> Tab:
             if res.data and len(res.data) > 0:
                 return Tab(**res.data[0])
         except Exception as e:
-            logger.warning(f"Supabase insert failed: {e}. Retrying without version_name/user_id...")
+            logger.warning(f"Supabase insert failed: {e}. Retrying without version_name/user_id/strumming_pattern...")
             try:
-                compat_record = {k: v for k, v in record.items() if k not in ("version_name", "user_id")}
+                compat_record = {k: v for k, v in record.items() if k not in ("version_name", "user_id", "strumming_pattern")}
                 res = client.table("tabs").insert(compat_record).execute()
                 if res.data and len(res.data) > 0:
                     d = dict(res.data[0])
                     d["version_name"] = payload.version_name or "Chords"
                     d["user_id"] = user_id
+                    d["strumming_pattern"] = payload.strumming_pattern.strip() if payload.strumming_pattern else None
                     return Tab(**d)
             except Exception as e2:
                 logger.error(f"Supabase insert fallback failed: {e2}. Falling back to SQLite.")
@@ -407,8 +422,8 @@ def create_tab_db(payload: TabCreate, author_id: Optional[str] = None) -> Tab:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tabs (user_id, title, artist, version_name, tuning, capo, difficulty, content, is_favorite, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO tabs (user_id, title, artist, version_name, tuning, capo, difficulty, strumming_pattern, content, is_favorite, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 user_id,
@@ -418,6 +433,7 @@ def create_tab_db(payload: TabCreate, author_id: Optional[str] = None) -> Tab:
                 payload.tuning,
                 payload.capo,
                 payload.difficulty,
+                payload.strumming_pattern.strip() if payload.strumming_pattern else None,
                 payload.content,
                 1 if payload.is_favorite else 0,
                 now,
@@ -453,6 +469,8 @@ def update_tab_db(tab_id: int, payload: TabUpdate, current_user_id: Optional[str
         update_data["capo"] = payload.capo
     if payload.difficulty is not None:
         update_data["difficulty"] = payload.difficulty
+    if payload.strumming_pattern is not None:
+        update_data["strumming_pattern"] = payload.strumming_pattern.strip() if payload.strumming_pattern else None
     if payload.content is not None:
         update_data["content"] = payload.content
     if payload.is_favorite is not None:
